@@ -1,6 +1,8 @@
-import type { ConsoleLogEntry, NetworkLogEntry } from "@trawl/types"
+import type { CapturedResponseEntry, ConsoleLogEntry, NetworkLogEntry } from "@trawl/types"
 import type { ConsoleMessage, Page, Request } from "patchright"
 import { captureLimit } from "./captureConfig"
+
+import { attachResponseCapture, type ResponseCaptureOptions } from "./responseCapture"
 
 // Captured evidence lives in memory alongside a browser slot, so every dimension is
 // bounded: entry counts, the length of any single captured string, and the total across
@@ -23,7 +25,7 @@ const CONSOLE_LEVELS: Record<string, ConsoleLogEntry["level"]> = {
 // Mirrors the opt-in flags on ScrapeRequest. `redirectChain` is served by
 // MainDocumentResponseTracker (the response listener already exists there) rather than
 // by this module — it travels in the same bag so a tier takes one capture argument.
-export interface CaptureOptions {
+export interface CaptureOptions extends ResponseCaptureOptions {
   consoleLogs?: boolean
   networkLogs?: boolean
   redirectChain?: boolean
@@ -32,13 +34,16 @@ export interface CaptureOptions {
 export interface CapturedPageEvidence {
   consoleLogs?: ConsoleLogEntry[]
   networkLogs?: NetworkLogEntry[]
+  capturedResponses?: CapturedResponseEntry[]
 }
 
 export interface PageCapture {
+  /** Holds the page open for the response-capture settle window; a no-op otherwise. */
+  settle(budgetMs: number): Promise<void>
   drain(budgetMs?: number): Promise<CapturedPageEvidence>
 }
 
-const NO_CAPTURE: PageCapture = { drain: async () => ({}) }
+const NO_CAPTURE: PageCapture = { settle: async () => {}, drain: async () => ({}) }
 
 const ms = (value: number): number => Math.round(value * 100) / 100
 
@@ -48,7 +53,15 @@ const ms = (value: number): number => Math.round(value * 100) / 100
  * the caller — a capture failure degrades that field, not the scrape.
  */
 export function attachPageCapture(page: Page, options: CaptureOptions): PageCapture {
-  if (!options.consoleLogs && !options.networkLogs) return NO_CAPTURE
+  if (!options.consoleLogs && !options.networkLogs && !options.captureResponses?.length) return NO_CAPTURE
+
+  const responses = attachResponseCapture(page, options)
+  if (!options.consoleLogs && !options.networkLogs) {
+    return {
+      settle: (budgetMs) => responses.settle(budgetMs),
+      drain: async () => ({ capturedResponses: await responses.drain() }),
+    }
+  }
 
   const consoleLogs: ConsoleLogEntry[] = []
   const networkLogs: NetworkLogEntry[] = []
@@ -140,7 +153,9 @@ export function attachPageCapture(page: Page, options: CaptureOptions): PageCapt
   page.once("close", detach)
 
   return {
+    settle: (budgetMs) => responses.settle(budgetMs),
     async drain(budgetMs = SIZES_TIMEOUT_MS) {
+      const capturedResponses = await responses.drain()
       try {
         detach()
         const timeoutMs = Math.max(0, Math.min(SIZES_TIMEOUT_MS, Number.isFinite(budgetMs) ? budgetMs : 0))
@@ -152,11 +167,12 @@ export function attachPageCapture(page: Page, options: CaptureOptions): PageCapt
         return {
           consoleLogs: options.consoleLogs ? consoleLogs.map((entry) => ({ ...entry })) : undefined,
           networkLogs: options.networkLogs ? networkLogs.map((entry) => ({ ...entry })) : undefined,
+          capturedResponses,
         }
       } catch (err) {
         acceptingSizes = false
         console.log(`[capture] drain failed: ${err instanceof Error ? err.message : String(err)}`)
-        return {}
+        return { capturedResponses }
       }
     },
   }
