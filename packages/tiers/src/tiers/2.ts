@@ -1,5 +1,6 @@
 import type { BrowserHandle } from "@trawl/browser"
 import type { Cookie, SessionData, TierResult } from "@trawl/types"
+import { capturePageScreenshot } from "../screenshot"
 import { solvePageCaptchas } from "../solvers"
 import { normalizeSameSite, toCookies } from "../utils/cookies"
 import {
@@ -27,6 +28,7 @@ export interface Tier2Result extends TierResult {
   cookies?: Cookie[]
   statusCode?: number
   captchasSolved?: string[]
+  screenshot?: string
 }
 
 export async function runTier2(
@@ -38,6 +40,7 @@ export async function runTier2(
   method?: string,
   body?: string,
   validateOutboundUrl?: OutboundUrlValidator,
+  screenshot?: boolean,
 ): Promise<Tier2Result> {
   const start = Date.now()
   const activeContext = handle.context
@@ -122,6 +125,10 @@ export async function runTier2(
       captchasSolved = result.solved
     }
 
+    // Shot before the html read so the image and the returned html describe the same
+    // moment — the settle wait inside the capture can outlast a slow-clearing challenge.
+    const shot = screenshot ? await capturePageScreenshot(page) : undefined
+
     const finalHtml = await page.content()
     if (isCloudflarePage(finalHtml, mainResponse.headers)) {
       return { tier: 2, status: "blocked", durationMs: Date.now() - start, reason: "session-expired" }
@@ -143,6 +150,7 @@ export async function runTier2(
       cookies,
       statusCode: mainResponse.status,
       captchasSolved: captchasSolved.length > 0 ? captchasSolved : undefined,
+      screenshot: shot,
     }
   } catch (err) {
     return {
