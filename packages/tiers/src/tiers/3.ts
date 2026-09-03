@@ -17,6 +17,7 @@ import {
 import { normalizeHtml } from "../utils/html"
 import { trackMainDocumentResponses } from "../utils/mainResponse"
 import { isHardNetworkFailure } from "../utils/network"
+import { installOutboundPolicy, type OutboundUrlValidator } from "../utils/outboundPolicy"
 import { isProxyTransportFailure, normalizeProxyError, proxyResponseFailure } from "../utils/proxyFailure"
 import { captureResponse, isTextContentType } from "../utils/response"
 import type { RouteLike } from "../utils/sanitize"
@@ -59,6 +60,7 @@ export async function runTier3(
   extraHeaders?: Record<string, string>,
   method?: string,
   body?: string,
+  validateOutboundUrl?: OutboundUrlValidator,
 ): Promise<Tier3Result> {
   const start = Date.now()
 
@@ -76,6 +78,7 @@ export async function runTier3(
       requestReplacement: handle.requestBrowserReplacement,
     })
     const page = await freshCtx.newPage()
+    await installOutboundPolicy(page, validateOutboundUrl)
     const initialCookies = snapshotChallengeCookies(await freshCtx.cookies())
     if ((extraHeaders && Object.keys(extraHeaders).length > 0) || method === "POST") {
       await page.route(url, (route: RouteLike) => {

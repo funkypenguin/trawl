@@ -22,6 +22,14 @@ export const CONTENT_PROCESSES = Number(process.env.BROWSER_CONTENT_PROCESSES ??
 // deployment that never meets DataDome. Set it to 1 to scrape DataDome targets.
 export const HEADFUL_POOL_SIZE = Number(process.env.BROWSER_HEADFUL_POOL_SIZE ?? "0")
 
+// Optional MCP Streamable HTTP endpoint. Keep this disabled unless the API is
+// reachable only by trusted clients; v1 intentionally has no authentication.
+export const MCP_ENABLED = /^(1|true|yes)$/i.test(process.env.MCP_ENABLED ?? "")
+export const MCP_ALLOWED_ORIGINS = (process.env.MCP_ALLOWED_ORIGINS ?? "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean)
+
 // How long a browser may stay checked out before the pool calls it wedged rather than
 // busy. A scrape's own budget is req.maxTimeout (default 60s), so 3x that is well clear
 // of anything legitimate while still catching a hung checkout within a few minutes.

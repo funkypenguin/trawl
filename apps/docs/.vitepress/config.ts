@@ -51,6 +51,7 @@ export default defineConfig({
           { text: "Prowlarr", link: "/integrations/prowlarr" },
           { text: "Jackett", link: "/integrations/jackett" },
           { text: "*arr Apps", link: "/integrations/arr-apps" },
+          { text: "MCP", link: "/integrations/mcp" },
         ],
       },
       {
