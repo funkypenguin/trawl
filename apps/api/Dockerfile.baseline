@@ -78,14 +78,19 @@ RUN --mount=type=secret,id=GITHUB_TOKEN,env=GITHUB_TOKEN \
 # Baking a verified copy into the image makes startup deterministic and removes the
 # runtime GitHub dependency + first-launch download latency. The size check fails the
 # build if the download is truncated, so a corrupt file can never be baked in.
-# P3TERX/GeoLite.mmdb keeps only the last few daily releases, so a pin more than a few days
-# old stops resolving and the build fails on a 404 here. Bump both values together.
-ARG GEOLITE_RELEASE=2026.08.25
-ARG GEOLITE_CITY_SHA256=b481e34bdfbeb937434d09b47d89622c36051560c5f64853b54e081678c7df74
+# P3TERX/GeoLite.mmdb retains only its two most recent releases, so a pinned tag 404s
+# within days and every build after that fails on curl exit 22 — which is what happened
+# to the 2026.08.07 and 2026.08.19 pins. Track the rolling latest and keep the guarantee
+# that actually matters here (a truncated file is never baked in) with a size floor; the
+# digest of a release that gets deleted cannot be kept current, and it was never a
+# provenance check on MaxMind's data anyway.
+ARG GEOLITE_CITY_MIN_BYTES=50000000
 RUN curl -fsSL \
-      "https://github.com/P3TERX/GeoLite.mmdb/releases/download/${GEOLITE_RELEASE}/GeoLite2-City.mmdb" \
+      "https://github.com/P3TERX/GeoLite.mmdb/releases/latest/download/GeoLite2-City.mmdb" \
       -o /opt/camoufox/GeoLite2-City.mmdb && \
-    echo "${GEOLITE_CITY_SHA256}  /opt/camoufox/GeoLite2-City.mmdb" | sha256sum --check --strict -
+    actual=$(stat -c%s /opt/camoufox/GeoLite2-City.mmdb) && \
+    [ "$actual" -ge "${GEOLITE_CITY_MIN_BYTES}" ] || \
+      { echo "GeoLite2-City.mmdb is $actual bytes, below ${GEOLITE_CITY_MIN_BYTES}" >&2; exit 1; }
 
 # Bake uBlock Origin into Camoufox's expected addon directory. camoufox-js still
 # performs its normal addon registration at startup, but no runtime download or
