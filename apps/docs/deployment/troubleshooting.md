@@ -17,8 +17,9 @@ description: Common issues and how to fix them.
    `docker compose pull trawl && docker compose up -d --force-recreate trawl`.
 2. **shm_size too small** — Ensure `shm_size: 1gb` is set on the API service.
 
-Redis is optional at runtime. If it is unavailable, TRAWL disables the Tier 2 session-cache
-fast path but can still become ready and scrape through the other tiers.
+Redis is optional at runtime. If it is unavailable, TRAWL temporarily disables the Tier 2
+session-cache fast path but can still become ready and scrape through the other tiers. Unless
+`REDIS_RETRY_DELAY_MS=0`, it keeps reconnecting in the background.
 
 ## Logs report `Tier 2 disabled`
 
@@ -33,13 +34,11 @@ docker compose exec trawl sh -lc 'printf "%s\n" "$REDIS_URL"; getent hosts redis
 docker compose exec trawl bun -e 'import { RedisClient } from "bun"; const client = new RedisClient(process.env.REDIS_URL); await client.connect(); console.log(await client.ping()); client.close()'
 ```
 
-With the supplied Compose files, TRAWL waits for the Redis healthcheck before starting. If the
-second command returns `PONG` on a deployment that logged the warning during an earlier start,
-restart only TRAWL to enable Tier 2:
-
-```bash
-docker compose restart trawl
-```
+With the supplied Redis-backed Compose files, TRAWL waits for the Redis healthcheck before
+starting. A slow host may still exceed the client-side connection timeout; TRAWL now retries in the
+background and logs `session cache connected` when Tier 2 becomes available, without a process
+restart. Increase `REDIS_CONNECT_TIMEOUT_MS` if every attempt times out, or adjust
+`REDIS_RETRY_DELAY_MS` to change the retry interval.
 
 If the command fails, inspect `docker compose config` for an overridden `REDIS_URL`, custom
 `network_mode`, or networks that are not shared by the `trawl` and `redis` services. Inside Docker,

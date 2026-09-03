@@ -63,6 +63,11 @@ This handles provider cookies expiring or being rejected before the Redis TTL en
 
 TRAWL's cache backend is Redis 8.8. TRAWL talks to it with `new RedisClient(REDIS_URL)` from Bun's native Redis client (not ioredis).
 
+Each connection attempt is bounded by `REDIS_CONNECT_TIMEOUT_MS` (default 5 seconds). If Redis is
+not ready, scraping continues without Tier 2 while TRAWL retries in the background every
+`REDIS_RETRY_DELAY_MS` (default 5 seconds). Set the retry delay to `0` when Redis is intentionally
+absent.
+
 ```typescript
 import { RedisClient } from 'bun'
 

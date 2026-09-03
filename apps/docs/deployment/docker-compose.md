@@ -119,6 +119,8 @@ TRAWL and Redis.
 | `BROWSER_ACQUIRE_TIMEOUT_MS`     | `15000`              | How long `acquire()` polls for a free browser before returning HTTP 429 |
 | `BROWSER_RECYCLE_AFTER_CONTEXTS` | `8`                  | Rolling-replace after this many Tier 3/4 contexts; `0` disables it      |
 | `REDIS_URL`                      | `redis://redis:6379` | Redis connection (set automatically in compose)                         |
+| `REDIS_CONNECT_TIMEOUT_MS`       | `5000`               | Maximum time for each Redis connection attempt                          |
+| `REDIS_RETRY_DELAY_MS`           | `5000`               | Background reconnect delay; `0` disables retry                          |
 | `PROXY_URL`                      | —                    | Optional Tier 3 datacenter proxy or pool                                |
 | `RESIDENTIAL_PROXY_URL`          | —                    | Enables Tier 4 proxy escalation                                         |
 | `MITM_PROXY_ENABLED`             | `false`              | Starts the general HTTP/HTTPS proxy                                     |

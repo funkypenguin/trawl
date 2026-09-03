@@ -396,6 +396,8 @@ for pool and mounted-file examples.
 | `BROWSER_CONTENT_PROCESSES`      | `2`                      | Cap Firefox content processes per browser (`dom.ipc.processCount`); lowers RAM/CPU  |
 | `SESSION_TTL_SECONDS`            | `3600`                   | Redis session cache TTL (seconds)                                                   |
 | `REDIS_URL`                      | `redis://localhost:6379` | Redis connection string                                                             |
+| `REDIS_CONNECT_TIMEOUT_MS`       | `5000`                   | Maximum time for each Redis connection attempt                                      |
+| `REDIS_RETRY_DELAY_MS`           | `5000`                   | Delay before reconnecting after startup failure; `0` disables retry                 |
 | `PROXY_URL`                      | —                        | Optional Tier 3 HTTP or SOCKS5 proxy, or comma-separated pool                       |
 | `PROXY_LIST_FILE`                | —                        | File containing one Tier 3 proxy URL per line                                       |
 | `RESIDENTIAL_PROXY_URL`          | —                        | Enables Tier 4 proxy escalation                                                     |
