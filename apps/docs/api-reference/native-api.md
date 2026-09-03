@@ -47,8 +47,8 @@ interface ScrapeRequest {
 | `settleTimeout` | number | 15000  | Milliseconds to hold the page open after load waiting for a match; ends early on the first captured body, on `waitForSelector`, or on network idle. Only read alongside `captureResponses`  |
 | `waitForSelector` | string | —    | CSS selector that also ends the settle window early. Only read alongside `captureResponses`                                                                                                 |
 
-Captured console messages and URLs can contain credentials, tokens, or personal data.
-Treat these opt-in diagnostic fields as sensitive output.
+Captured response bodies, headers, console messages, and URLs can contain credentials,
+tokens, or personal data. Treat these opt-in diagnostic fields as sensitive output.
 
 ## Response
 

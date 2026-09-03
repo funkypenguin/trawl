@@ -4,7 +4,7 @@ import type { SessionData } from "@trawl/types"
 import type { OrchestratorDeps } from "../src/orchestrator"
 import { scrape } from "../src/orchestrator"
 import { runTier2 } from "../src/tiers/2"
-import { attachResponseCapture } from "../src/utils/responseCapture"
+import { attachResponseCapture, wildcardMatch } from "../src/utils/responseCapture"
 
 const PAGE_HTML = `<html><head><title>Shell</title></head><body>${"content ".repeat(20)}</body></html>`
 
@@ -21,7 +21,8 @@ const response = (
     contentType?: string | null
     body?: Buffer | Error
     contentLength?: number
-    wireSize?: number
+    omitContentLength?: boolean
+    contentEncoding?: string
     onRead?: () => void
   } = {},
 ) => ({
@@ -29,7 +30,14 @@ const response = (
   status: () => options.status ?? 200,
   headers: () => ({
     ...(options.contentType === null ? {} : { "content-type": options.contentType ?? "application/json" }),
-    ...(options.contentLength ? { "content-length": String(options.contentLength) } : {}),
+    ...(!options.omitContentLength
+      ? {
+          "content-length": String(
+            options.contentLength ?? (options.body instanceof Buffer ? options.body.length : 15),
+          ),
+        }
+      : {}),
+    ...(options.contentEncoding ? { "content-encoding": options.contentEncoding } : {}),
   }),
   body: async () => {
     options.onRead?.()
@@ -42,7 +50,7 @@ const response = (
     sizes: async () => ({
       requestBodySize: 0,
       requestHeadersSize: 0,
-      responseBodySize: options.wireSize ?? 0,
+      responseBodySize: 0,
       responseHeadersSize: 0,
     }),
   }),
@@ -122,6 +130,13 @@ const MAX_BODY_BYTES = 5_242_880
 const MAX_READ_BYTES = MAX_BODY_BYTES * 2
 
 describe("attachResponseCapture", () => {
+  test("matches pathological wildcard patterns without constructing a regular expression", () => {
+    const pattern = `${"*a".repeat(1_000)}*?z`
+    expect(wildcardMatch(pattern, `${"a".repeat(1_001)}z`)).toBe(true)
+    expect(wildcardMatch("https://?.example.com/*", "https://x.example.com/api")).toBe(true)
+    expect(wildcardMatch("https://?.example.com/*", "https://xx.example.com/api")).toBe(false)
+  })
+
   test("attaches nothing and captures nothing without patterns", async () => {
     const { page, emitter } = makePage()
 
@@ -144,7 +159,7 @@ describe("attachResponseCapture", () => {
       {
         url: "https://example.com/api/search?q=shoes",
         status: 201,
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", "content-length": "15" },
         body: '{"items":[1,2]}',
         base64Encoded: false,
         truncated: false,
@@ -209,7 +224,7 @@ describe("attachResponseCapture", () => {
 
     const entries = await capture.drain()
     expect(entries?.map((entry) => entry.body?.length ?? null)).toEqual([MAX_BODY_BYTES, MAX_BODY_BYTES, null])
-    expect(entries?.[2].error).toBe("total capture budget exhausted")
+    expect(entries?.[2].error).toBe("total capture read budget exhausted")
   })
 
   test("never reads a body whose declared length is past the read ceiling", async () => {
@@ -233,7 +248,7 @@ describe("attachResponseCapture", () => {
     expect(entries?.[0].error).toContain("read ceiling")
   })
 
-  test("measures an undeclared body before reading it, and refuses an oversize one", async () => {
+  test("never reads a body whose size is unknown in advance", async () => {
     const { page, emitter } = makePage()
     let read = false
 
@@ -241,29 +256,43 @@ describe("attachResponseCapture", () => {
     emitter.emit(
       "response",
       response("https://example.com/api/stream", {
-        wireSize: MAX_READ_BYTES + 1,
+        omitContentLength: true,
         onRead: () => {
           read = true
         },
       }),
     )
-    emitter.emit("response", response("https://example.com/api/small", { wireSize: 15 }))
-
     const entries = await capture.drain()
     expect(read).toBe(false)
-    expect(entries?.[0].error).toContain("read ceiling")
-    expect(entries?.[1].body).toBe('{"items":[1,2]}')
+    expect(entries?.[0].error).toContain("size is unknown")
   })
+
+  for (const contentEncoding of ["gzip", "br", "deflate", "zstd"]) {
+    test(`never reads a ${contentEncoding}-compressed body`, async () => {
+      const { page, emitter } = makePage()
+      let read = false
+      const capture = attachResponseCapture(page as never, { captureResponses: ["/api/"] })
+      emitter.emit(
+        "response",
+        response("https://example.com/api/data", {
+          contentEncoding,
+          onRead: () => {
+            read = true
+          },
+        }),
+      )
+      const entries = await capture.drain()
+      expect(read).toBe(false)
+      expect(entries?.[0]).toMatchObject({ body: null, error: expect.stringContaining("compressed") })
+    })
+  }
 
   test("still trims a body between the keep cap and the read ceiling", async () => {
     const { page, emitter } = makePage()
     const raw = Buffer.alloc(MAX_BODY_BYTES + 4_096, 0x61)
 
     const capture = attachResponseCapture(page as never, { captureResponses: ["/api/search"] })
-    emitter.emit(
-      "response",
-      response("https://example.com/api/search", { body: raw, contentLength: raw.length, wireSize: raw.length }),
-    )
+    emitter.emit("response", response("https://example.com/api/search", { body: raw, contentLength: raw.length }))
 
     const entries = await capture.drain()
     expect(entries?.[0].truncated).toBe(true)
@@ -295,10 +324,10 @@ describe("attachResponseCapture", () => {
     const entries = await capture.drain()
     expect(reads).toHaveLength(2)
     expect(entries?.[2].body).toBeNull()
-    expect(entries?.[2].error).toBe("total capture budget exhausted")
+    expect(entries?.[2].error).toBe("total capture read budget exhausted")
   })
 
-  test("refuses a measured body that the reads already in flight leave no room for", async () => {
+  test("refuses a declared body once the cumulative read budget is reserved", async () => {
     const { page, emitter } = makePage()
     const reads: string[] = []
     let release = () => {}
@@ -310,7 +339,7 @@ describe("attachResponseCapture", () => {
     for (let i = 0; i < 2; i++) {
       const url = `https://example.com/api/page-${i}`
       emitter.emit("response", {
-        ...response(url, { wireSize: 6_291_456 }),
+        ...response(url, { contentLength: 6_291_456 }),
         body: async () => {
           reads.push(url)
           await gate
@@ -325,7 +354,7 @@ describe("attachResponseCapture", () => {
     const entries = await capture.drain()
     expect(reads).toEqual(["https://example.com/api/page-0"])
     expect(entries?.[1].body).toBeNull()
-    expect(entries?.[1].error).toBe("capture budget held by reads in flight")
+    expect(entries?.[1].error).toBe("total capture read budget exhausted")
   })
 
   test("records the reason when a matched body cannot be read", async () => {
@@ -350,6 +379,22 @@ describe("attachResponseCapture", () => {
     expect(entries?.[0].body).toBeNull()
     expect(entries?.[0].error).toBe("body read did not complete")
   }, 10_000)
+
+  test("returns an immutable snapshot that a late body read cannot change", async () => {
+    const { page, emitter } = makePage()
+    let release = (value: Buffer) => value
+    const body = new Promise<Buffer>((resolve) => {
+      release = resolve
+    })
+    const capture = attachResponseCapture(page as never, { captureResponses: ["/api/"] })
+    emitter.emit("response", { ...response("https://example.com/api/data"), body: () => body })
+
+    const entries = await capture.drain(1)
+    expect(entries?.[0]).toMatchObject({ body: null, error: "body read did not complete" })
+    release(Buffer.from('{"late":true}'))
+    await Promise.resolve()
+    expect(entries?.[0]).toMatchObject({ body: null, error: "body read did not complete" })
+  })
 
   test("caps the number of captured bodies", async () => {
     const { page, emitter } = makePage()
@@ -464,6 +509,7 @@ describe("browser tiers", () => {
       {},
       "GET",
       "",
+      undefined,
       false,
       { captureResponses: ["/api/search"], settleTimeout: 50 },
     )
@@ -473,7 +519,7 @@ describe("browser tiers", () => {
       {
         url: "https://example.com/api/search?q=shoes",
         status: 200,
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", "content-length": "15" },
         body: '{"items":[1,2]}',
         base64Encoded: false,
         truncated: false,
@@ -492,10 +538,21 @@ describe("browser tiers", () => {
 
   test("a pattern that matches nothing yields an empty array, not undefined", async () => {
     const { page } = makePage(shell)
-    const result = await runTier2("https://example.com", poolHandle(page), session, 4_000, {}, "GET", "", false, {
-      captureResponses: ["/api/never"],
-      settleTimeout: 50,
-    })
+    const result = await runTier2(
+      "https://example.com",
+      poolHandle(page),
+      session,
+      4_000,
+      {},
+      "GET",
+      "",
+      undefined,
+      false,
+      {
+        captureResponses: ["/api/never"],
+        settleTimeout: 50,
+      },
+    )
 
     expect(result.status).toBe("success")
     expect(result.capturedResponses).toEqual([])
@@ -507,11 +564,22 @@ describe("browser tiers", () => {
       emit("console", { type: () => "error", text: () => "boom", timestamp: () => 1 })
     })
 
-    const result = await runTier2("https://example.com", poolHandle(page), session, 4_000, {}, "GET", "", false, {
-      consoleLogs: true,
-      captureResponses: ["/api/search"],
-      settleTimeout: 50,
-    })
+    const result = await runTier2(
+      "https://example.com",
+      poolHandle(page),
+      session,
+      4_000,
+      {},
+      "GET",
+      "",
+      undefined,
+      false,
+      {
+        consoleLogs: true,
+        captureResponses: ["/api/search"],
+        settleTimeout: 50,
+      },
+    )
 
     expect(result.consoleLogs?.map((entry) => entry.message)).toEqual(["boom"])
     expect(result.capturedResponses).toHaveLength(1)
@@ -550,6 +618,7 @@ describe("orchestrator", () => {
 
     expect(result.tier).toBe(2)
     expect(result.capturedResponses?.map((entry) => entry.body)).toEqual(['{"items":[1,2]}'])
+    expect(result.timings.every((timing) => !("capturedResponses" in timing))).toBe(true)
   })
 
   test("omits the field entirely by default", async () => {

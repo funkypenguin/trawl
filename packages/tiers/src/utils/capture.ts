@@ -59,7 +59,7 @@ export function attachPageCapture(page: Page, options: CaptureOptions): PageCapt
   if (!options.consoleLogs && !options.networkLogs) {
     return {
       settle: (budgetMs) => responses.settle(budgetMs),
-      drain: async () => ({ capturedResponses: await responses.drain() }),
+      drain: async (budgetMs) => ({ capturedResponses: await responses.drain(budgetMs) }),
     }
   }
 
@@ -155,10 +155,12 @@ export function attachPageCapture(page: Page, options: CaptureOptions): PageCapt
   return {
     settle: (budgetMs) => responses.settle(budgetMs),
     async drain(budgetMs = SIZES_TIMEOUT_MS) {
-      const capturedResponses = await responses.drain()
+      const drainStarted = Date.now()
+      const totalBudget = Math.max(0, Number.isFinite(budgetMs) ? budgetMs : 0)
+      const capturedResponses = await responses.drain(totalBudget)
       try {
         detach()
-        const timeoutMs = Math.max(0, Math.min(SIZES_TIMEOUT_MS, Number.isFinite(budgetMs) ? budgetMs : 0))
+        const timeoutMs = Math.max(0, Math.min(SIZES_TIMEOUT_MS, totalBudget - (Date.now() - drainStarted)))
         if (pendingSizes.length > 0 && timeoutMs > 0) {
           await Promise.race([Promise.all(pendingSizes), new Promise((r) => setTimeout(r, timeoutMs))])
         }

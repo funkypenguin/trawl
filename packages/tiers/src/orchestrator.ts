@@ -95,6 +95,7 @@ export async function scrape(
       consoleLogs?: unknown
       networkLogs?: unknown
       redirectChain?: unknown
+      capturedResponses?: unknown
     },
   ) => {
     const {
@@ -103,6 +104,7 @@ export async function scrape(
       consoleLogs: _consoleLogs,
       networkLogs: _networkLogs,
       redirectChain: _redirectChain,
+      capturedResponses: _capturedResponses,
       ...publicResult
     } = r
     timings.push(publicResult)
