@@ -36,6 +36,7 @@ services:
       MITM_PROXY_PORT: ${MITM_PROXY_PORT:-8192}
       MITM_PROXY_CA_DIR: ${MITM_PROXY_CA_DIR:-/data/proxy-ca}
       MITM_PROXY_MAX_TIER: ${MITM_PROXY_MAX_TIER:-4}
+      MITM_PROXY_ALWAYS_SCRAPE: ${MITM_PROXY_ALWAYS_SCRAPE:-false}
       MITM_PROXY_DEBUG: ${MITM_PROXY_DEBUG:-false}
     volumes:
       # Persist the proxy's CA so clients don't need to re-install on every restart.

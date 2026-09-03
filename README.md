@@ -147,6 +147,7 @@ MITM_PROXY_ENABLED=true
 MITM_PROXY_PORT=8192
 MITM_PROXY_CA_DIR=/data/proxy-ca   # persist the CA (mount a volume)
 MITM_PROXY_MAX_TIER=4              # cap escalation (e.g. 3 to stay off residential)
+MITM_PROXY_ALWAYS_SCRAPE=false     # opt in to bypass the proxy's direct Tier 0 probe
 ```
 
 By default the listener binds `0.0.0.0` so clients on a Docker bridge network can reach
@@ -406,6 +407,7 @@ for pool and mounted-file examples.
 | `MITM_PROXY_HOST`                | `0.0.0.0`                | Bind address; `127.0.0.1` for loopback-only                                         |
 | `MITM_PROXY_CA_DIR`              | `/data/proxy-ca`         | Persistent root CA certificate and private-key directory                            |
 | `MITM_PROXY_MAX_TIER`            | `4`                      | Cap escalation used by the proxy (e.g. `3` to stay off residential)                 |
+| `MITM_PROXY_ALWAYS_SCRAPE`       | `false`                  | Skip proxy Tier 0; disables the direct media/large-file streaming path               |
 | `MITM_PROXY_DEBUG`               | `false`                  | Log one line per proxied request (errors are always logged)                         |
 
 ## Stack

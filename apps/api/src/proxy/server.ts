@@ -8,7 +8,7 @@ import {
   scrape,
 } from "@trawl/tiers"
 import { MitmCa } from "./ca"
-import { ChallengeCache } from "./challengeCache"
+import { ChallengeCache, type ChallengeMode } from "./challengeCache"
 import { directForwardHttp, directForwardHttps, type ForwardResult } from "./directForward"
 import { writeResponse, writeResponseFromBuffer, writeResponseFromStream } from "./httpResponse"
 import { responseFromScrapeResult } from "./responsePolicy"
@@ -20,6 +20,9 @@ const MAX_HEADER_BYTES = 64 * 1024
 
 const challengeCache = new ChallengeCache({ ttlMs: 5 * 60 * 1000 })
 
+export const shouldBypassTier0 = (alwaysScrape: boolean | undefined, cachedMode: ChallengeMode | undefined): boolean =>
+  alwaysScrape === true || cachedMode === "cf"
+
 export interface MitmProxyOptions {
   port: number
   caDir: string
@@ -27,6 +30,7 @@ export interface MitmProxyOptions {
   host: string
   maxTier?: 1 | 2 | 3 | 4
   maxTimeout?: number
+  alwaysScrape?: boolean
   debug?: boolean
 }
 
@@ -317,7 +321,8 @@ async function proxyRequest(
   // Trust the cache for repeat visits — skip Tier 0 entirely if we recently saw
   // a CF challenge here and jump straight to scrape().
   const cachedMode = challengeCache.get(domain)
-  if (cachedMode === "cf") {
+  if (shouldBypassTier0(opts.alwaysScrape, cachedMode)) {
+    if (opts.debug && opts.alwaysScrape) console.log(`[proxy] Tier 0 bypassed for ${url} -> scrape()`)
     return await serveViaScrape(stream, url, method, clientHeaders, body, opts)
   }
 

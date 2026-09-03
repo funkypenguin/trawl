@@ -125,6 +125,7 @@ TRAWL and Redis.
 | `MITM_PROXY_PORT`                | `8192`               | Proxy listen and published port                                         |
 | `MITM_PROXY_HOST`                | `0.0.0.0`            | Proxy bind address                                                      |
 | `MITM_PROXY_CA_DIR`              | `/data/proxy-ca`     | Persistent root CA directory                                            |
+| `MITM_PROXY_ALWAYS_SCRAPE`       | `false`              | Skip proxy Tier 0 and enter the scraper immediately                     |
 | `MCP_ENABLED`                    | `false`              | Enables the Streamable HTTP endpoint at `/mcp`                          |
 | `MCP_ALLOWED_ORIGINS`            | —                    | Comma-separated allowed browser origins                                 |
 

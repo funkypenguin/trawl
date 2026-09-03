@@ -1,5 +1,6 @@
 import { createApiApp } from "./app"
 import {
+  MITM_PROXY_ALWAYS_SCRAPE,
   MITM_PROXY_CA_DIR,
   MITM_PROXY_DEBUG,
   MITM_PROXY_ENABLED,
@@ -30,6 +31,7 @@ if (MITM_PROXY_ENABLED) {
     caDir: MITM_PROXY_CA_DIR,
     deps: getDeps(),
     maxTier: MITM_PROXY_MAX_TIER,
+    alwaysScrape: MITM_PROXY_ALWAYS_SCRAPE,
     debug: MITM_PROXY_DEBUG,
   })
 }

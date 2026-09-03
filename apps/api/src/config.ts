@@ -69,6 +69,9 @@ export const MITM_PROXY_CA_DIR = process.env.MITM_PROXY_CA_DIR ?? "/data/proxy-c
 const configuredMaxTier = Number(process.env.MITM_PROXY_MAX_TIER)
 const isTier = (tier: number): tier is 1 | 2 | 3 | 4 => tier === 1 || tier === 2 || tier === 3 || tier === 4
 export const MITM_PROXY_MAX_TIER = isTier(configuredMaxTier) ? configuredMaxTier : undefined
+// Skip the proxy's direct Tier 0 probe and route ordinary HTTP requests into scrape().
+// This is separate from ScrapeRequest.skipHttp, which controls scraper Tier 1.
+export const MITM_PROXY_ALWAYS_SCRAPE = /^(1|true|yes)$/i.test(process.env.MITM_PROXY_ALWAYS_SCRAPE ?? "")
 // Log one line per proxied request (method, url, status, content-type, bytes). Off by
 // default — proxied clients can be chatty. Errors are always logged.
 export const MITM_PROXY_DEBUG = /^(1|true|yes)$/i.test(process.env.MITM_PROXY_DEBUG ?? "")
