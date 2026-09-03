@@ -32,6 +32,14 @@ describe("API request validation", () => {
     expect(() => validateScrapeRequest({ method: "GET", url: "https://example.com" })).not.toThrow()
   })
 
+  test("accepts boolean screenshot flags and rejects other values", () => {
+    expect(() => validateScrapeRequest({ url: "https://example.com", screenshot: true })).not.toThrow()
+    expect(() => validateScrapeRequest({ url: "https://example.com", screenshot: false })).not.toThrow()
+    expect(() => validateScrapeRequest({ url: "https://example.com", screenshot: "true" })).toThrow(
+      new RequestValidationError("screenshot must be a boolean", 400),
+    )
+  })
+
   test("extracts only string URLs for error envelopes", () => {
     expect(requestUrl({ url: "https://example.com" })).toBe("https://example.com")
     expect(requestUrl({ url: 42 })).toBe("")

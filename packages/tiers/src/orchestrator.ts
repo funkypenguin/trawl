@@ -79,8 +79,8 @@ export async function scrape(
   const sanitizedHeaders = sanitizeHeaders(req.headers)
   requireContentTypeForBody(sanitizedHeaders, Boolean(req.body))
 
-  const emit = (r: TierResult & { challenge?: unknown }) => {
-    const { challenge: _challenge, ...publicResult } = r
+  const emit = (r: TierResult & { challenge?: unknown; screenshot?: string }) => {
+    const { challenge: _challenge, screenshot: _screenshot, ...publicResult } = r
     timings.push(publicResult)
     deps.onTierAttempt?.(publicResult)
   }
@@ -152,6 +152,7 @@ export async function scrape(
         req.method,
         req.body,
         deps.validateOutboundUrl,
+        req.screenshot,
       )
       if (t2.challenge === "datadome" && !handle.headful) {
         await switchToHeadful()
@@ -164,6 +165,7 @@ export async function scrape(
           req.method,
           req.body,
           deps.validateOutboundUrl,
+          req.screenshot,
         )
       }
       emit(t2)
@@ -190,6 +192,7 @@ export async function scrape(
           body: t2.body,
           responseHeaders: t2.responseHeaders,
           contentType: t2.contentType,
+          screenshot: t2.screenshot,
         }
       }
       // Session failed — purge it
@@ -219,6 +222,7 @@ export async function scrape(
         req.method,
         req.body,
         deps.validateOutboundUrl,
+        req.screenshot,
       )
       if (t3.challenge === "datadome" && !handle.headful) {
         await switchToHeadful()
@@ -231,6 +235,7 @@ export async function scrape(
           req.method,
           req.body,
           deps.validateOutboundUrl,
+          req.screenshot,
         )
       }
 
@@ -269,6 +274,7 @@ export async function scrape(
         body: t3.body,
         responseHeaders: t3.responseHeaders,
         contentType: t3.contentType,
+        screenshot: t3.screenshot,
       }
     }
 
@@ -300,6 +306,7 @@ export async function scrape(
         req.method,
         req.body,
         deps.validateOutboundUrl,
+        req.screenshot,
       )
       if (t4.challenge === "datadome" && !handle.headful) {
         await switchToHeadful()
@@ -312,6 +319,7 @@ export async function scrape(
           req.method,
           req.body,
           deps.validateOutboundUrl,
+          req.screenshot,
         )
       }
 
@@ -347,6 +355,7 @@ export async function scrape(
         body: t4.body,
         responseHeaders: t4.responseHeaders,
         contentType: t4.contentType,
+        screenshot: t4.screenshot,
       }
     }
 

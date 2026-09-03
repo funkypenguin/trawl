@@ -1,6 +1,7 @@
 import type { BrowserHandle } from "@trawl/browser"
 import { closeTemporaryContext, FINGERPRINT, newFreshContext } from "@trawl/browser"
 import type { Cookie, TierResult } from "@trawl/types"
+import { capturePageScreenshot } from "../screenshot"
 import { solvePageCaptchas } from "../solvers"
 import { routeChallengeWait } from "../utils/challengeRouter"
 import { snapshotChallengeCookies, toCookies } from "../utils/cookies"
@@ -34,6 +35,7 @@ export interface Tier4Result extends TierResult {
   userAgent?: string
   statusCode?: number
   captchasSolved?: string[]
+  screenshot?: string
 }
 
 export async function runTier4(
@@ -45,6 +47,7 @@ export async function runTier4(
   method?: string,
   body?: string,
   validateOutboundUrl?: OutboundUrlValidator,
+  screenshot?: boolean,
 ): Promise<Tier4Result> {
   const start = Date.now()
 
@@ -127,6 +130,10 @@ export async function runTier4(
       captchasSolved = solveResult.solved
     }
 
+    // Shot before the html read so the image and the returned html describe the same
+    // moment — the settle wait inside the capture can outlast a slow-clearing challenge.
+    const shot = screenshot ? await capturePageScreenshot(page, maxTimeout - (Date.now() - start)) : undefined
+
     const html = await page.content()
 
     if (html.length < 100) {
@@ -208,6 +215,7 @@ export async function runTier4(
       userAgent: await page.evaluate(() => navigator.userAgent).catch(() => FINGERPRINT.userAgent),
       statusCode: mainResponse.status,
       captchasSolved: captchasSolved.length > 0 ? captchasSolved : undefined,
+      screenshot: shot,
     }
   } catch (err) {
     return {
