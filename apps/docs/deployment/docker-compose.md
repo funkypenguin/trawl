@@ -125,6 +125,8 @@ TRAWL and Redis.
 | `MITM_PROXY_PORT`                | `8192`               | Proxy listen and published port                                         |
 | `MITM_PROXY_HOST`                | `0.0.0.0`            | Proxy bind address                                                      |
 | `MITM_PROXY_CA_DIR`              | `/data/proxy-ca`     | Persistent root CA directory                                            |
+| `MCP_ENABLED`                    | `false`              | Enables the Streamable HTTP endpoint at `/mcp`                          |
+| `MCP_ALLOWED_ORIGINS`            | —                    | Comma-separated allowed browser origins                                 |
 
 All supplied Compose files publish port `8192` and mount the `trawl_proxy_ca` volume. The listener
 does not start until `MITM_PROXY_ENABLED=true`. See [Proxy Configuration](/proxy/configuration).
