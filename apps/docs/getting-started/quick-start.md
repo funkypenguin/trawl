@@ -38,7 +38,7 @@ This starts two containers:
 The API takes **15–30 seconds** to launch and warm the browser pool. Watch progress:
 
 ```bash
-docker compose logs -f api
+docker compose logs -f trawl
 ```
 
 You'll see:
@@ -115,6 +115,9 @@ http://localhost:8191
 ```
 
 Done. No other configuration changes are needed. TRAWL implements the FlareSolverr v2 API exactly.
+
+This uses the API on port `8191`. Do not configure port `8192` here: that is the separate,
+optional HTTP/HTTPS forward proxy and it is disabled by default.
 
 ---
 

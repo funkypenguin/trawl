@@ -7,11 +7,14 @@ description: Common issues and how to fix them.
 
 ## API never becomes ready
 
-**Symptom:** `docker compose logs api` shows browser launches but the API never prints `ready — all N browsers warm`.
+**Symptom:** `docker compose logs trawl` shows browser launches but the API never prints `ready — all N browsers warm`.
 
 **Causes:**
 
-1. **Camoufox binary not installed** — The API Dockerfile runs `bunx camoufox-js fetch`. If this step was skipped (e.g. build cache reuse), rebuild: `docker compose build --no-cache api`.
+1. **Camoufox binary not installed** — The API image normally installs it during publication.
+   The supplied Compose files use a prebuilt image and have no `build` section, so
+   `docker compose build` intentionally does nothing. Pull and recreate the service instead:
+   `docker compose pull trawl && docker compose up -d --force-recreate trawl`.
 2. **shm_size too small** — Ensure `shm_size: 1gb` is set on the API service.
 
 Redis is optional at runtime. If it is unavailable, TRAWL disables the Tier 2 session-cache
@@ -133,6 +136,29 @@ docker compose up -d --force-recreate
 2. Prowlarr can reach the TRAWL container. If they're in different Docker networks, add TRAWL to Prowlarr's network (see [Prowlarr docs](/integrations/prowlarr)).
 3. Run `docker exec prowlarr curl -s http://trawl:8191/health` to verify network reachability from inside the Prowlarr container.
 
+## Prowlarr reports `Unable to connect to proxy`
+
+First identify which TRAWL interface Prowlarr is using:
+
+- **FlareSolverr integration:** configure `http://trawl:8191` under **Settings → Indexers →
+  FlareSolverr**. Port `8191` is the API and does not require `MITM_PROXY_ENABLED`.
+- **HTTP indexer proxy:** port `8192` is disabled by default. Set `MITM_PROXY_ENABLED=true`, recreate
+  the TRAWL service, and configure an HTTP proxy with host `trawl` and port `8192`. HTTPS targets
+  also require TRAWL's CA in the Prowlarr container trust store; see
+  [Proxy client setup](/proxy/client-setup#prowlarr).
+
+The supplied Compose service is named `trawl`, not `api`. Check both interfaces from the Prowlarr
+container when diagnosing Docker networking:
+
+```bash
+docker exec prowlarr curl -fsS http://trawl:8191/health
+docker exec prowlarr curl -fsS --proxy http://trawl:8192 http://neverssl.com/ -o /dev/null
+```
+
+The second command succeeds only when the optional forward proxy is enabled. If either hostname
+lookup fails, attach Prowlarr and TRAWL to the same Docker network before changing application
+settings.
+
 ## High memory usage / OOM kills
 
 Each Camoufox instance uses 350–500 MB. With 3 browsers, expect ~1.5 GB total. If the API is being killed:
@@ -145,7 +171,7 @@ Each Camoufox instance uses 350–500 MB. With 3 browsers, expect ~1.5 GB total.
 
 ```bash
 # Live API logs
-docker compose logs -f api
+docker compose logs -f trawl
 
 # Check Redis keys
 docker compose exec redis redis-cli keys "*"

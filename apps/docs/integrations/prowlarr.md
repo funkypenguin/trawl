@@ -9,6 +9,9 @@ TRAWL implements the FlareSolverr v2 API exactly, including the `version: "2.0.0
 
 ## Setup
 
+This is the recommended FlareSolverr-compatible integration. It uses TRAWL's API on port `8191`;
+the optional forward proxy on port `8192` is a separate mode.
+
 1. Open Prowlarr and go to **Settings → Indexers**
 2. Scroll to the **FlareSolverr** section
 3. Set the URL to your TRAWL API address:
@@ -60,8 +63,16 @@ http://172.17.0.1:8191            # Linux Docker default bridge
 
 ## Troubleshooting
 
-**Test fails with "connection refused"**  
-The API container isn't running or the port is wrong. Run `docker compose logs api` and check the port mapping with `docker compose ps`.
+**Test fails with "connection refused"**
+
+The API container isn't running or the port is wrong. Run `docker compose logs trawl` and check the port mapping with `docker compose ps`.
+
+**Prowlarr reports "Unable to connect to proxy"**
+
+If you configured TRAWL under **Settings → Indexer Proxies → HTTP** rather than as a
+FlareSolverr service, you are using the optional forward proxy. Enable it with
+`MITM_PROXY_ENABLED=true`, recreate the `trawl` service, use port `8192`, and install TRAWL's CA in
+the Prowlarr container for HTTPS targets. See [Proxy client setup](/proxy/client-setup#prowlarr).
 
 **Test succeeds but searches still fail**  
 Some indexers use a different domain than their main site. TRAWL caches cookies per hostname — the first request to each subdomain takes the full challenge time.
