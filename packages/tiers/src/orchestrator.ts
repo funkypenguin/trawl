@@ -85,8 +85,23 @@ export async function scrape(
   const sanitizedHeaders = sanitizeHeaders(req.headers)
   requireContentTypeForBody(sanitizedHeaders, Boolean(req.body))
 
-  const emit = (r: TierResult & { challenge?: unknown; screenshot?: string }) => {
-    const { challenge: _challenge, screenshot: _screenshot, ...publicResult } = r
+  const emit = (
+    r: TierResult & {
+      challenge?: unknown
+      screenshot?: string
+      consoleLogs?: unknown
+      networkLogs?: unknown
+      redirectChain?: unknown
+    },
+  ) => {
+    const {
+      challenge: _challenge,
+      screenshot: _screenshot,
+      consoleLogs: _consoleLogs,
+      networkLogs: _networkLogs,
+      redirectChain: _redirectChain,
+      ...publicResult
+    } = r
     timings.push(publicResult)
     deps.onTierAttempt?.(publicResult)
   }

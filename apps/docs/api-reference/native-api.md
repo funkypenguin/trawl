@@ -41,6 +41,9 @@ interface ScrapeRequest {
 | `networkLogs` | boolean | false   | Capture per-request resource timings on the browser tiers (2–4) and return them as `networkLogs`                                                                                                |
 | `redirectChain` | boolean | false | Capture the URLs the main document walked on the browser tiers (2–4) and return them as `redirectChain`                                                                                         |
 
+Captured console messages and URLs can contain credentials, tokens, or personal data.
+Treat these opt-in diagnostic fields as sensitive output.
+
 ## Response
 
 ```typescript

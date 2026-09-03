@@ -1,17 +1,20 @@
 import type { Page, Response } from "patchright"
-
+import { captureLimit } from "./captureConfig"
 import type { MinimalResponse } from "./response"
 
 type NavigationResponse = MinimalResponse & Pick<Response, "request">
 
 // A redirect loop is capped by the browser long before this, but the chain is caller-
 // visible data so it gets a bound of its own.
-const MAX_REDIRECT_ENTRIES = Number(process.env.CAPTURE_MAX_REDIRECT_ENTRIES ?? 50)
+const MAX_REDIRECT_ENTRIES = captureLimit(process.env.CAPTURE_MAX_REDIRECT_ENTRIES, 50)
+const MAX_REDIRECT_STRING_CHARS = captureLimit(process.env.CAPTURE_MAX_STRING_CHARS, 2_000)
+const MAX_REDIRECT_TOTAL_CHARS = captureLimit(process.env.CAPTURE_MAX_TOTAL_CHARS, 1_000_000)
 
 /** Tracks the latest top-level document response across redirects. */
 export class MainDocumentResponseTracker {
   private latest?: NavigationResponse
   private readonly chain: string[] = []
+  private chainChars = 0
 
   constructor(
     private readonly page: Pick<Page, "mainFrame">,
@@ -30,8 +33,15 @@ export class MainDocumentResponseTracker {
   }
 
   private record(url: string): void {
-    if (this.chain.length >= MAX_REDIRECT_ENTRIES || this.chain.includes(url)) return
+    if (
+      this.chain.length >= MAX_REDIRECT_ENTRIES ||
+      url.length > MAX_REDIRECT_STRING_CHARS ||
+      this.chainChars + url.length > MAX_REDIRECT_TOTAL_CHARS ||
+      this.chain.includes(url)
+    )
+      return
     this.chain.push(url)
+    this.chainChars += url.length
   }
 
   get response(): MinimalResponse | undefined {

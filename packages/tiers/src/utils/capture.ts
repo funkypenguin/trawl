@@ -1,15 +1,16 @@
 import type { ConsoleLogEntry, NetworkLogEntry } from "@trawl/types"
 import type { ConsoleMessage, Page, Request } from "patchright"
+import { captureLimit } from "./captureConfig"
 
 // Captured evidence lives in memory alongside a browser slot, so every dimension is
 // bounded: entry counts, the length of any single captured string, and the total across
 // both arrays. Anything past a cap is dropped whole rather than silently truncated, and
 // the drop count is logged when the capture is drained. All caps are env-tunable.
-const MAX_CONSOLE_ENTRIES = Number(process.env.CAPTURE_MAX_CONSOLE_ENTRIES ?? 500)
-const MAX_NETWORK_ENTRIES = Number(process.env.CAPTURE_MAX_NETWORK_ENTRIES ?? 1_000)
-const MAX_STRING_CHARS = Number(process.env.CAPTURE_MAX_STRING_CHARS ?? 2_000)
-const MAX_TOTAL_CHARS = Number(process.env.CAPTURE_MAX_TOTAL_CHARS ?? 1_000_000)
-const SIZES_TIMEOUT_MS = Number(process.env.CAPTURE_SIZES_TIMEOUT_MS ?? 2_000)
+const MAX_CONSOLE_ENTRIES = captureLimit(process.env.CAPTURE_MAX_CONSOLE_ENTRIES, 500)
+const MAX_NETWORK_ENTRIES = captureLimit(process.env.CAPTURE_MAX_NETWORK_ENTRIES, 1_000)
+const MAX_STRING_CHARS = captureLimit(process.env.CAPTURE_MAX_STRING_CHARS, 2_000)
+const MAX_TOTAL_CHARS = captureLimit(process.env.CAPTURE_MAX_TOTAL_CHARS, 1_000_000)
+const SIZES_TIMEOUT_MS = captureLimit(process.env.CAPTURE_SIZES_TIMEOUT_MS, 2_000)
 
 // Console types that carry a severity of their own; everything else is informational.
 const CONSOLE_LEVELS: Record<string, ConsoleLogEntry["level"]> = {
@@ -34,7 +35,7 @@ export interface CapturedPageEvidence {
 }
 
 export interface PageCapture {
-  drain(): Promise<CapturedPageEvidence>
+  drain(budgetMs?: number): Promise<CapturedPageEvidence>
 }
 
 const NO_CAPTURE: PageCapture = { drain: async () => ({}) }
@@ -55,6 +56,7 @@ export function attachPageCapture(page: Page, options: CaptureOptions): PageCapt
   const attachedAt = Date.now()
   let charsUsed = 0
   let dropped = 0
+  let acceptingSizes = true
 
   const claim = (text: string): boolean => {
     if (text.length > MAX_STRING_CHARS || charsUsed + text.length > MAX_TOTAL_CHARS) {
@@ -112,6 +114,7 @@ export function attachPageCapture(page: Page, options: CaptureOptions): PageCapt
         request
           .sizes()
           .then((sizes) => {
+            if (!acceptingSizes) return
             entry.transferSize = sizes.responseBodySize + sizes.responseHeadersSize
             entry.encodedBodySize = sizes.responseBodySize
           })
@@ -137,18 +140,21 @@ export function attachPageCapture(page: Page, options: CaptureOptions): PageCapt
   page.once("close", detach)
 
   return {
-    async drain() {
+    async drain(budgetMs = SIZES_TIMEOUT_MS) {
       try {
         detach()
-        if (pendingSizes.length > 0) {
-          await Promise.race([Promise.all(pendingSizes), new Promise((r) => setTimeout(r, SIZES_TIMEOUT_MS))])
+        const timeoutMs = Math.max(0, Math.min(SIZES_TIMEOUT_MS, Number.isFinite(budgetMs) ? budgetMs : 0))
+        if (pendingSizes.length > 0 && timeoutMs > 0) {
+          await Promise.race([Promise.all(pendingSizes), new Promise((r) => setTimeout(r, timeoutMs))])
         }
+        acceptingSizes = false
         if (dropped > 0) console.log(`[capture] dropped ${dropped} entries past the configured caps`)
         return {
-          consoleLogs: options.consoleLogs ? consoleLogs : undefined,
-          networkLogs: options.networkLogs ? networkLogs : undefined,
+          consoleLogs: options.consoleLogs ? consoleLogs.map((entry) => ({ ...entry })) : undefined,
+          networkLogs: options.networkLogs ? networkLogs.map((entry) => ({ ...entry })) : undefined,
         }
       } catch (err) {
+        acceptingSizes = false
         console.log(`[capture] drain failed: ${err instanceof Error ? err.message : String(err)}`)
         return {}
       }

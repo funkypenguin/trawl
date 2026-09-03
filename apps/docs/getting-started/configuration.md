@@ -183,6 +183,10 @@ Anything past a cap is dropped whole rather than truncated, and the number of dr
 entries is logged once per scrape. A capture failure leaves the field unset and never
 fails the scrape.
 
+Console messages and request URLs may contain credentials, tokens, personal data, or
+other sensitive values. Treat diagnostic fields as sensitive output and avoid storing
+or forwarding them unless necessary.
+
 ## Session Cache
 
 ### `SESSION_TTL_SECONDS`

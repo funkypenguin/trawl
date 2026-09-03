@@ -40,6 +40,16 @@ describe("API request validation", () => {
     )
   })
 
+  for (const field of ["consoleLogs", "networkLogs", "redirectChain"] as const) {
+    test(`accepts boolean ${field} flags and rejects other values`, () => {
+      expect(() => validateScrapeRequest({ url: "https://example.com", [field]: true })).not.toThrow()
+      expect(() => validateScrapeRequest({ url: "https://example.com", [field]: false })).not.toThrow()
+      expect(() => validateScrapeRequest({ url: "https://example.com", [field]: "true" })).toThrow(
+        new RequestValidationError(`${field} must be a boolean`, 400),
+      )
+    })
+  }
+
   test("extracts only string URLs for error envelopes", () => {
     expect(requestUrl({ url: "https://example.com" })).toBe("https://example.com")
     expect(requestUrl({ url: 42 })).toBe("")

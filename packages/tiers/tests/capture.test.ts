@@ -4,7 +4,10 @@ import type { SessionData } from "@trawl/types"
 import type { OrchestratorDeps } from "../src/orchestrator"
 import { scrape } from "../src/orchestrator"
 import { runTier2 } from "../src/tiers/2"
+import type { runTier3 } from "../src/tiers/3"
+import type { runTier4 } from "../src/tiers/4"
 import { attachPageCapture } from "../src/utils/capture"
+import { captureLimit } from "../src/utils/captureConfig"
 import { MainDocumentResponseTracker } from "../src/utils/mainResponse"
 
 const PAGE_HTML = `<html><head><title>Ordinary Page</title></head><body>${"content ".repeat(20)}</body></html>`
@@ -101,6 +104,16 @@ const poolHandle = (page: unknown): BrowserHandle =>
     browser: {},
     fingerprint,
   }) satisfies BrowserHandle
+
+describe("capture configuration", () => {
+  test("uses safe fallbacks for malformed limits and accepts zero", () => {
+    for (const value of [undefined, "", "nope", "-1", "1.5", "Infinity", "9007199254740992"]) {
+      expect(captureLimit(value, 50)).toBe(50)
+    }
+    expect(captureLimit("0", 50)).toBe(0)
+    expect(captureLimit("123", 50)).toBe(123)
+  })
+})
 
 describe("attachPageCapture", () => {
   test("attaches nothing and captures nothing when neither flag is set", async () => {
@@ -208,6 +221,27 @@ describe("attachPageCapture", () => {
     expect(networkLogs).toHaveLength(1_000)
   })
 
+  test("honors the remaining request budget and never mutates returned entries later", async () => {
+    const { page, emitter } = makePage()
+    let resolveSizes: ((value: { responseBodySize: number; responseHeadersSize: number }) => void) | undefined
+    const slowRequest = {
+      ...request("https://example.com/slow.js"),
+      sizes: () =>
+        new Promise<{ responseBodySize: number; responseHeadersSize: number }>((resolve) => {
+          resolveSizes = resolve
+        }),
+    }
+
+    const capture = attachPageCapture(page as never, { networkLogs: true })
+    emitter.emit("requestfinished", slowRequest)
+    const { networkLogs } = await capture.drain(0)
+
+    expect(networkLogs?.[0].transferSize).toBeNull()
+    resolveSizes?.({ responseBodySize: 800, responseHeadersSize: 200 })
+    await Promise.resolve()
+    expect(networkLogs?.[0].transferSize).toBeNull()
+  })
+
   test("stops capturing once the page closes and once it is drained", async () => {
     const { page, emitter } = makePage()
 
@@ -253,6 +287,14 @@ describe("MainDocumentResponseTracker redirect chain", () => {
 
     expect(tracker.redirectChain).toHaveLength(50)
   })
+
+  test("drops an oversized redirect URL", () => {
+    const tracker = new MainDocumentResponseTracker({ mainFrame: () => mainFrame } as never, true)
+    tracker.observe(documentResponse(`https://example.com/${"x".repeat(2_001)}`, 302) as never)
+    tracker.observe(documentResponse("https://example.com/final") as never)
+
+    expect(tracker.redirectChain).toEqual(["https://example.com/final"])
+  })
 })
 
 describe("browser tiers", () => {
@@ -273,6 +315,7 @@ describe("browser tiers", () => {
       {},
       "GET",
       "",
+      undefined,
       false,
       { consoleLogs: true, networkLogs: true, redirectChain: true },
     )
@@ -295,9 +338,18 @@ describe("browser tiers", () => {
 
   test("a partial capture request returns only the fields it asked for", async () => {
     const { page } = makePage(emitPageActivity)
-    const result = await runTier2("https://example.com", poolHandle(page), session, 4_000, {}, "GET", "", false, {
-      consoleLogs: true,
-    })
+    const result = await runTier2(
+      "https://example.com",
+      poolHandle(page),
+      session,
+      4_000,
+      {},
+      "GET",
+      "",
+      undefined,
+      false,
+      { consoleLogs: true },
+    )
 
     expect(result.consoleLogs).toHaveLength(1)
     expect(result.networkLogs).toBeUndefined()
@@ -314,9 +366,18 @@ describe("browser tiers", () => {
       })
     })
 
-    const result = await runTier2("https://example.com", poolHandle(page), session, 4_000, {}, "GET", "", false, {
-      consoleLogs: true,
-    })
+    const result = await runTier2(
+      "https://example.com",
+      poolHandle(page),
+      session,
+      4_000,
+      {},
+      "GET",
+      "",
+      undefined,
+      false,
+      { consoleLogs: true },
+    )
 
     expect(result.status).toBe("success")
     expect(result.html).toContain("Ordinary Page")
@@ -358,6 +419,11 @@ describe("orchestrator", () => {
     expect(result.consoleLogs?.map((entry) => entry.message)).toEqual(["mixed content"])
     expect(result.networkLogs?.map((entry) => entry.initiatorType)).toEqual(["script"])
     expect(result.redirectChain).toEqual(["https://example.com/start", "https://example.com/final"])
+    expect(
+      result.timings.every(
+        (timing) => !("consoleLogs" in timing) && !("networkLogs" in timing) && !("redirectChain" in timing),
+      ),
+    ).toBeTrue()
   })
 
   test("omits every capture field by default", async () => {
@@ -378,5 +444,45 @@ describe("orchestrator", () => {
     expect(result.redirectChain).toBeUndefined()
     expect(emitter.listeners("console")).toBe(0)
     expect(emitter.listeners("requestfinished")).toBe(0)
+  })
+
+  test("passes diagnostics and the outbound validator through Tiers 3 and 4", async () => {
+    const { page } = makePage()
+    const validateOutboundUrl = async () => {}
+    const capture = { consoleLogs: true, networkLogs: true, redirectChain: true }
+    let tier3Args: Parameters<typeof runTier3> | undefined
+    let tier4Args: Parameters<typeof runTier4> | undefined
+    const deps = {
+      ...depsFor(page),
+      loadSession: async () => undefined,
+      validateOutboundUrl,
+      residentialProxyPool: { next: () => "http://residential.example:8080", markBad: () => {} },
+    }
+
+    const result = await scrape({ url: "https://example.com", skipHttp: true, maxTimeout: 4_000, ...capture }, deps, {
+      tier3: async (...args) => {
+        tier3Args = args
+        return { tier: 3, status: "blocked", durationMs: 1, reason: "wall" }
+      },
+      tier4: async (...args) => {
+        tier4Args = args
+        return {
+          tier: 4,
+          status: "success",
+          durationMs: 1,
+          html: PAGE_HTML,
+          consoleLogs: [],
+          networkLogs: [],
+          redirectChain: ["https://example.com"],
+        }
+      },
+    })
+
+    expect(tier3Args?.[7]).toBe(validateOutboundUrl)
+    expect(tier3Args?.[9]).toEqual(capture)
+    expect(tier4Args?.[7]).toBe(validateOutboundUrl)
+    expect(tier4Args?.[9]).toEqual(capture)
+    expect(result.tier).toBe(4)
+    expect(result.redirectChain).toEqual(["https://example.com"])
   })
 })
