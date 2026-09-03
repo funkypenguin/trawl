@@ -16,6 +16,7 @@ import {
 import { normalizeHtml } from "../utils/html"
 import { trackMainDocumentResponses } from "../utils/mainResponse"
 import { isHardNetworkFailure } from "../utils/network"
+import { installOutboundPolicy, type OutboundUrlValidator } from "../utils/outboundPolicy"
 import { isProxyTransportFailure, normalizeProxyError, proxyResponseFailure } from "../utils/proxyFailure"
 import { captureResponse, isTextContentType } from "../utils/response"
 import type { RouteLike } from "../utils/sanitize"
@@ -43,6 +44,7 @@ export async function runTier4(
   extraHeaders?: Record<string, string>,
   method?: string,
   body?: string,
+  validateOutboundUrl?: OutboundUrlValidator,
 ): Promise<Tier4Result> {
   const start = Date.now()
 
@@ -61,6 +63,7 @@ export async function runTier4(
     state.proxyContext = proxyContext
 
     const page = await proxyContext.newPage()
+    await installOutboundPolicy(page, validateOutboundUrl)
     const initialCookies = snapshotChallengeCookies(await proxyContext.cookies())
 
     if ((extraHeaders && Object.keys(extraHeaders).length > 0) || method === "POST") {

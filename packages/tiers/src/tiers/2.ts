@@ -11,6 +11,7 @@ import {
 } from "../utils/detect"
 import { normalizeHtml } from "../utils/html"
 import { trackMainDocumentResponses } from "../utils/mainResponse"
+import { installOutboundPolicy, type OutboundUrlValidator } from "../utils/outboundPolicy"
 import { captureResponse, isTextContentType } from "../utils/response"
 import type { RouteLike } from "../utils/sanitize"
 import { routeContinueOverrides } from "../utils/sanitize"
@@ -36,6 +37,7 @@ export async function runTier2(
   extraHeaders?: Record<string, string>,
   method?: string,
   body?: string,
+  validateOutboundUrl?: OutboundUrlValidator,
 ): Promise<Tier2Result> {
   const start = Date.now()
   const activeContext = handle.context
@@ -43,6 +45,7 @@ export async function runTier2(
 
   try {
     page = await activeContext.newPage()
+    await installOutboundPolicy(page, validateOutboundUrl)
 
     // addCookies replaces cookies by name+domain+path, so no need to clearCookies first.
     // Keeping the context's CF cookies (cf_clearance, __cf_bm) intact means CF sees a

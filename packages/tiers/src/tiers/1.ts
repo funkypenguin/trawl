@@ -14,6 +14,7 @@ import {
   isCloudflarePage,
 } from "../utils/detect"
 import { normalizeHtml } from "../utils/html"
+import type { OutboundUrlValidator } from "../utils/outboundPolicy"
 import { normalizeProxyError, proxyResponseFailure } from "../utils/proxyFailure"
 import { isTextContentType } from "../utils/response"
 
@@ -40,25 +41,44 @@ export async function runTier1(
   method?: string,
   body?: string,
   proxy?: string,
+  validateOutboundUrl?: OutboundUrlValidator,
 ): Promise<Tier1Result> {
   const start = Date.now()
   try {
     const m = (method ?? "GET").toUpperCase()
-    const res = await fetch(url, {
-      method: m,
-      body: METHODS_WITH_BODY.has(m) ? body : undefined,
-      headers: {
-        "User-Agent": FINGERPRINT.userAgent,
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Cache-Control": "no-cache",
-        Pragma: "no-cache",
-        ...extraHeaders,
-      },
-      redirect: "follow",
-      ...(proxy ? { proxy } : {}),
-    })
+    const headers = {
+      "User-Agent": FINGERPRINT.userAgent,
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Accept-Encoding": "gzip, deflate, br",
+      "Cache-Control": "no-cache",
+      Pragma: "no-cache",
+      ...extraHeaders,
+    }
+    let currentUrl = url
+    let currentMethod = m
+    let currentBody = METHODS_WITH_BODY.has(m) ? body : undefined
+    let res: Response
+    for (let redirects = 0; ; redirects++) {
+      await validateOutboundUrl?.(currentUrl)
+      res = await fetch(currentUrl, {
+        method: currentMethod,
+        body: currentBody,
+        headers,
+        redirect: validateOutboundUrl ? "manual" : "follow",
+        ...(proxy ? { proxy } : {}),
+      })
+      if (!validateOutboundUrl || ![301, 302, 303, 307, 308].includes(res.status)) break
+      const location = res.headers.get("location")
+      if (!location) break
+      if (redirects >= 9) throw new Error("Too many redirects")
+      await res.body?.cancel()
+      currentUrl = new URL(location, currentUrl).href
+      if (res.status === 303 || ((res.status === 301 || res.status === 302) && currentMethod === "POST")) {
+        currentMethod = "GET"
+        currentBody = undefined
+      }
+    }
 
     // AWS WAF's action header is authoritative when paired with its documented
     // status. Inspect it before reading the body: challenge responses may keep the
