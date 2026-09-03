@@ -1,7 +1,8 @@
 import type { BrowserHandle } from "@trawl/browser"
-import type { Cookie, SessionData, TierResult } from "@trawl/types"
+import type { ConsoleLogEntry, Cookie, NetworkLogEntry, SessionData, TierResult } from "@trawl/types"
 import { capturePageScreenshot } from "../screenshot"
 import { solvePageCaptchas } from "../solvers"
+import { attachPageCapture, type CaptureOptions } from "../utils/capture"
 import { normalizeSameSite, toCookies } from "../utils/cookies"
 import {
   hasAkamaiChallenge,
@@ -29,6 +30,9 @@ export interface Tier2Result extends TierResult {
   statusCode?: number
   captchasSolved?: string[]
   screenshot?: string
+  consoleLogs?: ConsoleLogEntry[]
+  networkLogs?: NetworkLogEntry[]
+  redirectChain?: string[]
 }
 
 export async function runTier2(
@@ -41,6 +45,7 @@ export async function runTier2(
   body?: string,
   validateOutboundUrl?: OutboundUrlValidator,
   screenshot?: boolean,
+  capture: CaptureOptions = {},
 ): Promise<Tier2Result> {
   const start = Date.now()
   const activeContext = handle.context
@@ -74,7 +79,8 @@ export async function runTier2(
       })
     }
 
-    const mainResponse = trackMainDocumentResponses(page)
+    const pageCapture = attachPageCapture(page, capture)
+    const mainResponse = trackMainDocumentResponses(page, { redirectChain: capture.redirectChain })
 
     await page.goto(url, { waitUntil: "domcontentloaded", timeout: maxTimeout })
     await page.waitForLoadState("networkidle", { timeout: 8_000 }).catch(() => {})
@@ -128,6 +134,7 @@ export async function runTier2(
     // Shot before the html read so the image and the returned html describe the same
     // moment — the settle wait inside the capture can outlast a slow-clearing challenge.
     const shot = screenshot ? await capturePageScreenshot(page, maxTimeout - (Date.now() - start)) : undefined
+    const evidence = await pageCapture.drain(maxTimeout - (Date.now() - start))
 
     const finalHtml = await page.content()
     if (isCloudflarePage(finalHtml, mainResponse.headers)) {
@@ -151,6 +158,8 @@ export async function runTier2(
       statusCode: mainResponse.status,
       captchasSolved: captchasSolved.length > 0 ? captchasSolved : undefined,
       screenshot: shot,
+      ...evidence,
+      redirectChain: capture.redirectChain ? mainResponse.redirectChain : undefined,
     }
   } catch (err) {
     return {

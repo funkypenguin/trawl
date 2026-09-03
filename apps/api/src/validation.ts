@@ -45,5 +45,10 @@ export function validateScrapeRequest(body: unknown): asserts body is ScrapeRequ
   if (req.screenshot !== undefined && typeof req.screenshot !== "boolean") {
     throw new RequestValidationError("screenshot must be a boolean", 400)
   }
+  for (const field of ["consoleLogs", "networkLogs", "redirectChain"] as const) {
+    if (req[field] !== undefined && typeof req[field] !== "boolean") {
+      throw new RequestValidationError(`${field} must be a boolean`, 400)
+    }
+  }
   requireContentTypeForBody(sanitizeHeaders(req.headers), Boolean(req.body))
 }
