@@ -18,11 +18,13 @@ const session: SessionData = { cookies: [], userAgent: "cached-user-agent", save
 
 interface PageStub {
   screenshotCalls: Array<Record<string, unknown>>
+  routePatterns: string[]
   page: any
 }
 
-const makePage = (options: { failScreenshot?: boolean } = {}): PageStub => {
+const makePage = (options: { failScreenshot?: boolean; image?: Buffer } = {}): PageStub => {
   const screenshotCalls: Array<Record<string, unknown>> = []
+  const routePatterns: string[] = []
   const page = {
     url: () => "https://example.com/landed",
     title: async () => "Ordinary Page",
@@ -34,20 +36,24 @@ const makePage = (options: { failScreenshot?: boolean } = {}): PageStub => {
     context: () => ({ cookies: async () => [] }),
     evaluate: async () => "test-agent",
     setExtraHTTPHeaders: async () => {},
+    route: async (pattern: string) => {
+      routePatterns.push(pattern)
+    },
     waitForLoadState: async () => {},
     close: async () => {},
     screenshot: async (opts: Record<string, unknown>) => {
       screenshotCalls.push(opts)
       if (options.failScreenshot) throw new Error("screenshot failed: target closed")
-      return JPEG
+      return options.image ?? JPEG
     },
   }
-  return { screenshotCalls, page }
+  return { screenshotCalls, routePatterns, page }
 }
 
 const poolHandle = (page: unknown): BrowserHandle =>
   ({
     id: 1,
+    headful: false,
     lease: 1,
     context: { newPage: async () => page, addCookies: async () => {}, cookies: async () => [] },
     browser: {},
@@ -57,6 +63,7 @@ const poolHandle = (page: unknown): BrowserHandle =>
 const freshHandle = (page: unknown): BrowserHandle =>
   ({
     id: 2,
+    headful: false,
     lease: 1,
     context: {},
     browser: {
@@ -86,6 +93,19 @@ describe("capturePageScreenshot", () => {
 
     expect(await capturePageScreenshot(page)).toBeUndefined()
   })
+
+  test("drops screenshots that exceed the 4 MB limit", async () => {
+    const { page } = makePage({ image: Buffer.alloc(4_000_001) })
+
+    expect(await capturePageScreenshot(page)).toBeUndefined()
+  })
+
+  test("does no capture work when the request budget is exhausted", async () => {
+    const { page, screenshotCalls } = makePage()
+
+    expect(await capturePageScreenshot(page, 0)).toBeUndefined()
+    expect(screenshotCalls).toHaveLength(0)
+  })
 })
 
 describe("browser tiers", () => {
@@ -99,6 +119,7 @@ describe("browser tiers", () => {
       {},
       "GET",
       "",
+      undefined,
       true,
     )
     expect(withShot.status).toBe("success")
@@ -121,6 +142,7 @@ describe("browser tiers", () => {
       {},
       "GET",
       "",
+      undefined,
       true,
     )
     expect(withShot.status).toBe("success")
@@ -143,6 +165,7 @@ describe("browser tiers", () => {
       {},
       "GET",
       "",
+      undefined,
       true,
     )
     expect(withShot.status).toBe("success")
@@ -169,6 +192,7 @@ describe("browser tiers", () => {
       {},
       "GET",
       "",
+      undefined,
       true,
     )
     expect(t2.status).toBe("success")
@@ -183,6 +207,7 @@ describe("browser tiers", () => {
       {},
       "GET",
       "",
+      undefined,
       true,
     )
     expect(t3.status).toBe("success")
@@ -196,6 +221,7 @@ describe("browser tiers", () => {
       {},
       "GET",
       "",
+      undefined,
       true,
     )
     expect(t4.status).toBe("success")
@@ -212,6 +238,32 @@ describe("orchestrator", () => {
     invalidateSession: async () => {},
   })
 
+  test("allows Tier 1 to succeed without producing or forcing a screenshot", async () => {
+    const originalFetch = globalThis.fetch
+    let browserAcquired = false
+    globalThis.fetch = (async () =>
+      new Response(PAGE_HTML, { status: 200, headers: { "content-type": "text/html" } })) as typeof fetch
+
+    try {
+      const result = await scrape(
+        { url: "https://example.com", screenshot: true },
+        {
+          ...depsFor(makePage().page),
+          acquireBrowser: async () => {
+            browserAcquired = true
+            return freshHandle(makePage().page)
+          },
+        },
+      )
+
+      expect(result.tier).toBe(1)
+      expect(result.screenshot).toBeUndefined()
+      expect(browserAcquired).toBeFalse()
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+
   test("emits the tier's screenshot on the scrape result when requested", async () => {
     const { page } = makePage()
 
@@ -222,6 +274,20 @@ describe("orchestrator", () => {
 
     expect(result.tier).toBe(3)
     expect(result.screenshot).toBe(JPEG_BASE64)
+    expect(result.timings.every((timing) => !("screenshot" in timing))).toBeTrue()
+  })
+
+  test("keeps the outbound policy installed when screenshots are requested", async () => {
+    const { page, routePatterns } = makePage()
+    const validateOutboundUrl = async () => {}
+
+    const result = await scrape(
+      { url: "https://example.com", skipHttp: true, maxTier: 3, maxTimeout: 4_000, screenshot: true },
+      { ...depsFor(page), validateOutboundUrl },
+    )
+
+    expect(result.screenshot).toBe(JPEG_BASE64)
+    expect(routePatterns).toContain("**/*")
   })
 
   test("omits the screenshot by default", async () => {

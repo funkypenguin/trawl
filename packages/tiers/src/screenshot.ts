@@ -11,15 +11,26 @@ const MAX_BYTES = Number(process.env.SCREENSHOT_MAX_BYTES ?? 4_000_000)
 // Viewport only — never fullPage. A challenge wall or an infinite-scroll page stitches
 // into a tall, mostly-empty canvas that costs seconds and shows less than the first
 // screen does.
-export async function capturePageScreenshot(page: Page): Promise<string | undefined> {
+export async function capturePageScreenshot(
+  page: Page,
+  budgetMs = Number.POSITIVE_INFINITY,
+): Promise<string | undefined> {
+  const deadline = Date.now() + Math.max(budgetMs, 0)
+  const remaining = (): number => Math.max(deadline - Date.now(), 0)
+
   try {
     // The HTML is read the moment a challenge clears, before late content (images,
     // fonts, lazy hydration) has painted. Give the page a bounded chance to settle,
     // then a short beat for whatever paints after the last request.
-    await page.waitForLoadState("networkidle", { timeout: SETTLE_MS }).catch(() => {})
-    await new Promise((r) => setTimeout(r, 300))
+    if (remaining() <= 0) return undefined
+    await page.waitForLoadState("networkidle", { timeout: Math.min(SETTLE_MS, remaining()) }).catch(() => {})
+    const paintWaitMs = Math.min(300, remaining())
+    if (paintWaitMs > 0) await new Promise((r) => setTimeout(r, paintWaitMs))
 
-    const image = await page.screenshot({ type: "jpeg", quality: JPEG_QUALITY, timeout: CAPTURE_TIMEOUT_MS })
+    const captureTimeout = Math.min(CAPTURE_TIMEOUT_MS, remaining())
+    if (captureTimeout <= 0) return undefined
+
+    const image = await page.screenshot({ type: "jpeg", quality: JPEG_QUALITY, timeout: captureTimeout })
     if (image.length > MAX_BYTES) {
       console.log(`[screenshot] dropped: ${image.length}b exceeds SCREENSHOT_MAX_BYTES=${MAX_BYTES}`)
       return undefined

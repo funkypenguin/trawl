@@ -161,6 +161,8 @@ Only read when a request sets `screenshot: true` — see [Native API](/api-refer
 
 A screenshot is never worth failing a scrape: exceeding any of these bounds leaves
 `screenshot` unset and logs the reason, and the scrape result is otherwise unchanged.
+Tier 1 is a plain HTTP fetch and never captures a screenshot. Set `skipHttp: true` if
+you need to force a browser-tier attempt.
 
 ## Session Cache
 

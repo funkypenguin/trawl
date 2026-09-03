@@ -33,7 +33,7 @@ interface ScrapeRequest {
 | `sessionId`  | string  | hostname | Override the Redis session key                                                                                                                                                                 |
 | `headers`    | object  | —        | Custom headers forwarded to the target across all tiers — see [Custom Headers](/api-reference/custom-headers)                                                                                  |
 | `proxy`      | string  | —        | Strict proxy route for this request. HTTP(S) proxies are used by Tier 1 and browser tiers; SOCKS proxies skip Tier 1. Direct Tier 1 and the unproxied Tier 2 cache are never used — see [Configuration § Proxies](/getting-started/configuration#proxies) |
-| `screenshot` | boolean | false    | Capture a base64 JPEG of the viewport on the browser tiers (2–4) and return it as `screenshot`. Tier 1 is a plain HTTP fetch and never produces one                                             |
+| `screenshot` | boolean | false    | Capture a base64 JPEG of the viewport on browser tiers (2–4) and return it as `screenshot`. Tier 1 never produces one; use `skipHttp: true` to force a browser attempt                        |
 
 ## Response
 

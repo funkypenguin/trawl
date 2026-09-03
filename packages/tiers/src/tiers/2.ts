@@ -127,7 +127,7 @@ export async function runTier2(
 
     // Shot before the html read so the image and the returned html describe the same
     // moment — the settle wait inside the capture can outlast a slow-clearing challenge.
-    const shot = screenshot ? await capturePageScreenshot(page) : undefined
+    const shot = screenshot ? await capturePageScreenshot(page, maxTimeout - (Date.now() - start)) : undefined
 
     const finalHtml = await page.content()
     if (isCloudflarePage(finalHtml, mainResponse.headers)) {
