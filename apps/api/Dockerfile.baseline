@@ -53,6 +53,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Pin the browser release and verify the architecture-specific asset before extracting it.
 # Direct downloads keep builds reproducible and avoid camoufox-js resolving "latest".
 ARG TARGETARCH
+# The pool spoofs a per-browser OS (packages/browser/src/pool.ts maps Win32 -> "windows",
+# MacIntel -> "macos"), and Camoufox spoofs that OS's font list with it. Dropping those
+# bundles therefore leaves a browser advertising fonts whose files are gone: every glyph
+# renders as a tofu box, and the fingerprint is self-inconsistent for anti-bot scoring.
+# Set KEEP_SPOOFED_OS_FONTS=1 to keep them (+891MB) when rendered output matters.
+ARG KEEP_SPOOFED_OS_FONTS=0
 RUN --mount=type=secret,id=GITHUB_TOKEN,env=GITHUB_TOKEN \
     case "$TARGETARCH" in \
       amd64) ZIP="camoufox-152.0.4-beta.28-lin.x86_64.zip"; SHA256="924f3109ccd6d47cd6a0384d67a345fadf975d48b6319f8dbbd5954c588982bd" ;; \
@@ -67,7 +73,9 @@ RUN --mount=type=secret,id=GITHUB_TOKEN,env=GITHUB_TOKEN \
     rm /tmp/camoufox.zip && \
     printf '{"version":"152.0.4","release":"beta.28"}\n' > /opt/camoufox/version.json && \
     chmod -R 755 /opt/camoufox && \
-    rm -rf /opt/camoufox/fonts/macos /opt/camoufox/fonts/windows
+    if [ "$KEEP_SPOOFED_OS_FONTS" != "1" ]; then \
+      rm -rf /opt/camoufox/fonts/macos /opt/camoufox/fonts/windows; \
+    fi
 
 # Bake the GeoIP database so camoufox-js never downloads it at runtime.
 # `geoip: true` (packages/browser/src/pool.ts) otherwise makes camoufox-js fetch
