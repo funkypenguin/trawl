@@ -1,4 +1,4 @@
-import { Elysia } from "elysia"
+import { createApiApp } from "./app"
 import {
   MITM_PROXY_CA_DIR,
   MITM_PROXY_DEBUG,
@@ -12,21 +12,8 @@ import {
 import { getDeps, initPool } from "./deps"
 import { registerLifecycleHandlers } from "./lifecycle"
 import { type MitmProxyHandle, shutdownMitmProxy, startMitmProxy } from "./proxy/server"
-import { healthRoute } from "./routes/health"
-import { indexRoute } from "./routes/index"
-import { proxyCaRoute } from "./routes/proxy-ca"
-import { scrapeRoute } from "./routes/scrape"
-import { statsRoute } from "./routes/stats"
-import { v1Route } from "./routes/v1"
 
-new Elysia()
-  .use(indexRoute())
-  .use(healthRoute())
-  .use(statsRoute())
-  .use(v1Route())
-  .use(scrapeRoute())
-  .use(proxyCaRoute())
-  .listen(PORT)
+createApiApp().listen(PORT)
 
 console.log(`[api] TRAWL starting on :${PORT}  (pool: ${POOL_SIZE} browser${POOL_SIZE === 1 ? "" : "s"})`)
 
