@@ -2,6 +2,17 @@ import { describe, expect, test } from "bun:test"
 import type net from "node:net"
 import { PassThrough } from "node:stream"
 import { writeResponseFromBuffer } from "../httpResponse"
+import { shouldBypassTier0 } from "../server"
+
+describe("always-scrape Tier 0 policy", () => {
+  test("is opt-in and preserves the existing challenge-cache bypass", () => {
+    expect(shouldBypassTier0(undefined, undefined)).toBe(false)
+    expect(shouldBypassTier0(false, "direct")).toBe(false)
+    expect(shouldBypassTier0(false, "cf")).toBe(true)
+    expect(shouldBypassTier0(true, undefined)).toBe(true)
+    expect(shouldBypassTier0(true, "direct")).toBe(true)
+  })
+})
 
 describe("writeResponseFromBuffer — Set-Cookie newline folding", () => {
   test("emits one Set-Cookie line per cookie when Playwright newline-folds them", () => {
