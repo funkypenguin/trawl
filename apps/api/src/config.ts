@@ -8,6 +8,18 @@ export const POOL_SIZE = Number(process.env.BROWSER_POOL_SIZE ?? "3")
 // Tune lower for fast-fail feedback in dev; tune higher for very heavy upstream targets.
 export const ACQUIRE_TIMEOUT_MS = Number(process.env.BROWSER_ACQUIRE_TIMEOUT_MS ?? "15000")
 export const SESSION_TTL = Number(process.env.SESSION_TTL_SECONDS ?? "3600")
+const positiveInteger = (value: string | undefined, fallback: number): number => {
+  const parsed = Number(value)
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : fallback
+}
+const nonNegativeInteger = (value: string | undefined, fallback: number): number => {
+  const parsed = Number(value)
+  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : fallback
+}
+// A failed initial Redis connection must not disable Tier 2 for the process lifetime.
+// Each attempt is bounded; failed attempts are retried in the background while the API stays ready.
+export const REDIS_CONNECT_TIMEOUT_MS = positiveInteger(process.env.REDIS_CONNECT_TIMEOUT_MS, 5_000)
+export const REDIS_RETRY_DELAY_MS = nonNegativeInteger(process.env.REDIS_RETRY_DELAY_MS, 5_000)
 // Rolling-replace a browser after this many Tier 3/4 temporary contexts. Every
 // creation counts regardless of outcome; 0 disables periodic replacement.
 export const RECYCLE_AFTER_TEMPORARY_CONTEXTS = Number(process.env.BROWSER_RECYCLE_AFTER_CONTEXTS ?? "8")

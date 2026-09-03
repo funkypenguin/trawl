@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Optional viewport screenshot: `screenshot: true` on `POST /scrape` returns a base64 JPEG of the viewport in `ScrapeResult.screenshot`, captured by the browser tiers (2-4) immediately before the HTML read so image and markup describe the same moment. Off by default; a stock request attaches nothing and does no extra work. Settle wait, capture timeout, JPEG quality, and maximum image size are bounded and tunable via `SCREENSHOT_*`, and a capture failure leaves the field unset rather than failing the scrape.
 
 ### Fixed
+- Recover the Redis-backed Tier 2 cache after a transient startup timeout without restarting TRAWL. Connection attempts are bounded by `REDIS_CONNECT_TIMEOUT_MS`, retry in the background after `REDIS_RETRY_DELAY_MS`, and stop cleanly during shutdown; setting the retry delay to `0` disables reconnects for intentionally cacheless deployments (#92).
 - Correct Docker troubleshooting commands to use the actual `trawl` Compose service name, and distinguish Prowlarr's always-available FlareSolverr API on port 8191 from the opt-in forward proxy on port 8192 (#96).
 - Wait for the bundled Redis service to pass a `PING` healthcheck before starting TRAWL, preventing a transient Compose startup race from disabling the Tier 2 session cache for the process lifetime (#90).
 - Reap orphaned Camoufox processes in both API container variants by running Bun under Tini (#79).

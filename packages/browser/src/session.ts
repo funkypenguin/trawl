@@ -27,6 +27,10 @@ export class SessionCache {
     }
   }
 
+  close(): void {
+    this.redis.close()
+  }
+
   private key(domain: string): string {
     return `session:${domain}`
   }

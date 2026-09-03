@@ -7,6 +7,8 @@ services:
       - "${MITM_PROXY_PORT:-8192}:${MITM_PROXY_PORT:-8192}"
     shm_size: 1gb
     environment:
+      # This variant has no Redis service, so do not keep retrying after the initial cache probe.
+      REDIS_RETRY_DELAY_MS: ${REDIS_RETRY_DELAY_MS:-0}
       BROWSER_POOL_SIZE: 1
       BROWSER_HEADFUL_POOL_SIZE: ${BROWSER_HEADFUL_POOL_SIZE:-0}
       MCP_ENABLED: ${MCP_ENABLED:-false}

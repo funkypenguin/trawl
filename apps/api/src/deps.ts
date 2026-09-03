@@ -10,6 +10,8 @@ import {
   POOL_SIZE,
   proxyPool,
   RECYCLE_AFTER_TEMPORARY_CONTEXTS,
+  REDIS_CONNECT_TIMEOUT_MS,
+  REDIS_RETRY_DELAY_MS,
   REDIS_URL,
   residentialProxyPool,
   SESSION_TTL,
@@ -19,12 +21,88 @@ import {
 const state: {
   pool?: BrowserPool
   headfulPool?: BrowserPool
-  sessionCache?: SessionCache
 } = {}
 
 const handleOwners = new WeakMap<object, BrowserPool>()
 
 type BrowserPoolOptions = ConstructorParameters<typeof BrowserPool>[0]
+
+interface SessionCacheClient {
+  connect(timeoutMs?: number): Promise<void>
+  close(): void
+  load(domain: string): Promise<SessionData | undefined>
+  save(domain: string, data: SessionData): Promise<void>
+  invalidate(domain: string): Promise<void>
+}
+
+interface SessionCacheRecoveryOptions {
+  createCache: () => SessionCacheClient
+  connectTimeoutMs: number
+  retryDelayMs: number
+  onConnected?: () => void
+  onUnavailable?: (error: unknown) => void
+}
+
+export class SessionCacheRecovery {
+  private cache?: SessionCacheClient
+  private retryTimer?: ReturnType<typeof setTimeout>
+  private stopped = true
+
+  constructor(private readonly options: SessionCacheRecoveryOptions) {}
+
+  current(): SessionCacheClient | undefined {
+    return this.cache
+  }
+
+  async start(): Promise<void> {
+    await this.stop()
+    this.stopped = false
+    await this.connect()
+  }
+
+  async stop(): Promise<void> {
+    this.stopped = true
+    if (this.retryTimer) clearTimeout(this.retryTimer)
+    this.retryTimer = undefined
+    this.cache?.close()
+    this.cache = undefined
+  }
+
+  private async connect(): Promise<void> {
+    if (this.stopped) return
+    const candidate = this.options.createCache()
+    try {
+      await candidate.connect(this.options.connectTimeoutMs)
+      if (this.stopped) {
+        candidate.close()
+        return
+      }
+      this.cache = candidate
+      this.options.onConnected?.()
+    } catch (error) {
+      candidate.close()
+      if (this.stopped) return
+      this.options.onUnavailable?.(error)
+      if (this.options.retryDelayMs === 0) return
+      this.retryTimer = setTimeout(() => {
+        this.retryTimer = undefined
+        void this.connect()
+      }, this.options.retryDelayMs)
+      this.retryTimer.unref?.()
+    }
+  }
+}
+
+const sessionCacheRecovery = new SessionCacheRecovery({
+  createCache: () => new SessionCache({ redisUrl: REDIS_URL, ttlSeconds: SESSION_TTL }),
+  connectTimeoutMs: REDIS_CONNECT_TIMEOUT_MS,
+  retryDelayMs: REDIS_RETRY_DELAY_MS,
+  onConnected: () => console.log("[api] session cache connected  (Tier 2 fast-path enabled)"),
+  onUnavailable: (err) => {
+    const retry = REDIS_RETRY_DELAY_MS > 0 ? `; retrying in ${REDIS_RETRY_DELAY_MS}ms` : ""
+    console.warn(`[api] session cache unavailable — Tier 2 disabled${retry}:`, err instanceof Error ? err.message : err)
+  },
+})
 
 interface InitPoolOptions {
   poolSize?: number
@@ -36,23 +114,10 @@ interface InitPoolOptions {
 export const getPool = () => state.pool
 export const getHeadfulPool = () => state.headfulPool
 
-const initSessionCache = async (): Promise<void> => {
-  try {
-    const sessionCache = new SessionCache({
-      redisUrl: REDIS_URL,
-      ttlSeconds: SESSION_TTL,
-    })
-    await sessionCache.connect()
-    state.sessionCache = sessionCache
-    console.log("[api] session cache connected  (Tier 2 fast-path enabled)")
-  } catch (err) {
-    state.sessionCache = undefined
-    console.warn("[api] session cache unavailable — Tier 2 disabled:", err instanceof Error ? err.message : err)
-  }
-}
+const initSessionCache = (): Promise<void> => sessionCacheRecovery.start()
 
 export const shutdownPools = async (): Promise<void> => {
-  await Promise.all([state.pool?.shutdown(), state.headfulPool?.shutdown()])
+  await Promise.all([sessionCacheRecovery.stop(), state.pool?.shutdown(), state.headfulPool?.shutdown()])
 }
 
 export const initPool = async ({
@@ -126,11 +191,20 @@ export const getDeps = (): OrchestratorDeps => {
       handleOwners.delete(handle)
     },
     loadSession: (d: string) =>
-      state.sessionCache ? state.sessionCache.load(d).catch(() => undefined) : Promise.resolve(undefined),
+      sessionCacheRecovery
+        .current()
+        ?.load(d)
+        .catch(() => undefined) ?? Promise.resolve(undefined),
     saveSession: (d: string, data: SessionData) =>
-      state.sessionCache ? state.sessionCache.save(d, data).catch(() => {}) : Promise.resolve(),
+      sessionCacheRecovery
+        .current()
+        ?.save(d, data)
+        .catch(() => {}) ?? Promise.resolve(),
     invalidateSession: (d: string) =>
-      state.sessionCache ? state.sessionCache.invalidate(d).catch(() => {}) : Promise.resolve(),
+      sessionCacheRecovery
+        .current()
+        ?.invalidate(d)
+        .catch(() => {}) ?? Promise.resolve(),
     proxyPool,
     residentialProxyPool,
   }

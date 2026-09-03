@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test"
 import type { BrowserPool } from "@trawl/browser"
 import type { BrowserHandle } from "@trawl/types"
-import { getDeps, getHeadfulPool, initPool, shutdownPools } from "./deps"
+import { getDeps, getHeadfulPool, initPool, SessionCacheRecovery, shutdownPools } from "./deps"
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 const handle = (headful: boolean): BrowserHandle => ({
   id: 0,
@@ -78,5 +80,91 @@ describe("browser pool dependencies", () => {
     ).rejects.toThrow("xvfb launch failed")
     expect(factory.pools[0]?.events).toEqual(["init", "health", "shutdown"])
     expect(factory.pools[1]?.events).toEqual(["init", "shutdown"])
+  })
+})
+
+describe("session cache recovery", () => {
+  test("enables the cache after a failed initial connection without restarting", async () => {
+    let attempts = 0
+    const closed: number[] = []
+    const connected: number[] = []
+    const recovery = new SessionCacheRecovery({
+      createCache: () => {
+        const id = ++attempts
+        return {
+          connect: async () => {
+            if (id === 1) throw new Error("redis still starting")
+          },
+          close: () => closed.push(id),
+          load: async () => undefined,
+          save: async () => {},
+          invalidate: async () => {},
+        }
+      },
+      connectTimeoutMs: 10,
+      retryDelayMs: 5,
+      onConnected: () => connected.push(attempts),
+    })
+
+    await recovery.start()
+    expect(recovery.current()).toBeUndefined()
+    await sleep(15)
+
+    expect(attempts).toBe(2)
+    expect(closed).toEqual([1])
+    expect(connected).toEqual([2])
+    expect(recovery.current()).toBeDefined()
+
+    await recovery.stop()
+    expect(closed).toEqual([1, 2])
+  })
+
+  test("cancels a pending retry during shutdown", async () => {
+    let attempts = 0
+    const recovery = new SessionCacheRecovery({
+      createCache: () => ({
+        connect: async () => {
+          attempts++
+          throw new Error("offline")
+        },
+        close: () => {},
+        load: async () => undefined,
+        save: async () => {},
+        invalidate: async () => {},
+      }),
+      connectTimeoutMs: 10,
+      retryDelayMs: 10,
+    })
+
+    await recovery.start()
+    await recovery.stop()
+    await sleep(20)
+
+    expect(attempts).toBe(1)
+    expect(recovery.current()).toBeUndefined()
+  })
+
+  test("supports intentionally cacheless deployments without a retry loop", async () => {
+    let attempts = 0
+    const recovery = new SessionCacheRecovery({
+      createCache: () => ({
+        connect: async () => {
+          attempts++
+          throw new Error("disabled")
+        },
+        close: () => {},
+        load: async () => undefined,
+        save: async () => {},
+        invalidate: async () => {},
+      }),
+      connectTimeoutMs: 10,
+      retryDelayMs: 0,
+    })
+
+    await recovery.start()
+    await sleep(15)
+
+    expect(attempts).toBe(1)
+    await recovery.stop()
   })
 })

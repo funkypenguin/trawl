@@ -57,6 +57,20 @@ With a specific database index:
 REDIS_URL=redis://redis:6379/1
 ```
 
+### `REDIS_CONNECT_TIMEOUT_MS`
+
+**Default:** `5000`
+
+Maximum duration of each Redis connection attempt. A failed attempt does not block the API or
+permanently disable Tier 2; TRAWL continues without the cache and reconnects in the background.
+
+### `REDIS_RETRY_DELAY_MS`
+
+**Default:** `5000`
+
+Delay between background connection attempts. Set it to `0` when Redis is intentionally absent to
+disable retries. The supplied minimal Compose variant does this automatically.
+
 ## Browser Pool
 
 ### `BROWSER_POOL_SIZE`
