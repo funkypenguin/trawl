@@ -14,12 +14,12 @@
 import { randomUUID } from "node:crypto"
 import { $ } from "bun"
 
-const STT_URL = process.env.STT_URL ?? ""
+const STT_URL = process.env.STT_URL?.trim() ?? ""
 const STT_KEY = process.env.STT_API_KEY ?? ""
 // FFMPEG_PATH: full path to ffmpeg binary. Docker installs 'ffmpeg' via apt.
 // On macOS with Playwright's bundled binary it's named 'ffmpeg-mac'; set this
 // env var or create a symlink to make 'ffmpeg' resolve.
-const FFMPEG = process.env.FFMPEG_PATH ?? "ffmpeg"
+const FFMPEG = process.env.FFMPEG_PATH?.trim() || "ffmpeg"
 
 // Google's public Speech API key — used in Google's own demos and the Buster extension.
 // Has been public since 2013. Google can't revoke it without breaking their own accessibility tooling.

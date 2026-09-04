@@ -8,11 +8,11 @@ import { attachResponseCapture, type ResponseCaptureOptions } from "./responseCa
 // bounded: entry counts, the length of any single captured string, and the total across
 // both arrays. Anything past a cap is dropped whole rather than silently truncated, and
 // the drop count is logged when the capture is drained. All caps are env-tunable.
-const MAX_CONSOLE_ENTRIES = captureLimit(process.env.CAPTURE_MAX_CONSOLE_ENTRIES, 500)
-const MAX_NETWORK_ENTRIES = captureLimit(process.env.CAPTURE_MAX_NETWORK_ENTRIES, 1_000)
-const MAX_STRING_CHARS = captureLimit(process.env.CAPTURE_MAX_STRING_CHARS, 2_000)
-const MAX_TOTAL_CHARS = captureLimit(process.env.CAPTURE_MAX_TOTAL_CHARS, 1_000_000)
-const SIZES_TIMEOUT_MS = captureLimit(process.env.CAPTURE_SIZES_TIMEOUT_MS, 2_000)
+const MAX_CONSOLE_ENTRIES = captureLimit(process.env.DIAGNOSTICS_MAX_CONSOLE_ENTRIES, 500)
+const MAX_NETWORK_ENTRIES = captureLimit(process.env.DIAGNOSTICS_MAX_NETWORK_ENTRIES, 1_000)
+const MAX_STRING_CHARS = captureLimit(process.env.DIAGNOSTICS_MAX_STRING_CHARS, 2_000)
+const MAX_TOTAL_CHARS = captureLimit(process.env.DIAGNOSTICS_MAX_TOTAL_CHARS, 1_000_000)
+const SIZES_TIMEOUT_MS = captureLimit(process.env.DIAGNOSTICS_SIZE_TIMEOUT_MS, 2_000)
 
 // Console types that carry a severity of their own; everything else is informational.
 const CONSOLE_LEVELS: Record<string, ConsoleLogEntry["level"]> = {

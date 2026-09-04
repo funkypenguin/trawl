@@ -6,9 +6,9 @@ type NavigationResponse = MinimalResponse & Pick<Response, "request">
 
 // A redirect loop is capped by the browser long before this, but the chain is caller-
 // visible data so it gets a bound of its own.
-const MAX_REDIRECT_ENTRIES = captureLimit(process.env.CAPTURE_MAX_REDIRECT_ENTRIES, 50)
-const MAX_REDIRECT_STRING_CHARS = captureLimit(process.env.CAPTURE_MAX_STRING_CHARS, 2_000)
-const MAX_REDIRECT_TOTAL_CHARS = captureLimit(process.env.CAPTURE_MAX_TOTAL_CHARS, 1_000_000)
+const MAX_REDIRECT_ENTRIES = captureLimit(process.env.REDIRECT_MAX_ENTRIES, 50)
+const MAX_REDIRECT_URL_CHARS = captureLimit(process.env.REDIRECT_MAX_URL_CHARS, 2_000)
+const MAX_REDIRECT_TOTAL_CHARS = captureLimit(process.env.REDIRECT_MAX_TOTAL_CHARS, 1_000_000)
 
 /** Tracks the latest top-level document response across redirects. */
 export class MainDocumentResponseTracker {
@@ -35,7 +35,7 @@ export class MainDocumentResponseTracker {
   private record(url: string): void {
     if (
       this.chain.length >= MAX_REDIRECT_ENTRIES ||
-      url.length > MAX_REDIRECT_STRING_CHARS ||
+      url.length > MAX_REDIRECT_URL_CHARS ||
       this.chainChars + url.length > MAX_REDIRECT_TOTAL_CHARS ||
       this.chain.includes(url)
     )
