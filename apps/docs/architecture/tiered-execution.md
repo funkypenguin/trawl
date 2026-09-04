@@ -57,7 +57,7 @@ Acquires a browser from the pool (or waits up to `BROWSER_ACQUIRE_TIMEOUT_MS` �
 
 On success:
 - Extracts all cookies from the page context
-- Writes `session:{hostname} → { cookies, userAgent, savedAt }` to Redis (TTL = `SESSION_TTL_SECONDS`)
+- Writes `session:{hostname} → { cookies, userAgent, savedAt }` to Redis (TTL = `REDIS_SESSION_TTL_SECONDS`)
 - Returns the HTML and cookies to the caller
 
 Uses [Camoufox](https://github.com/daijro/camoufox) — Firefox with fingerprint patching at the C++/Juggler level to reduce common automation signals. Success still depends on the target's challenge variant, IP reputation, and upstream network conditions.

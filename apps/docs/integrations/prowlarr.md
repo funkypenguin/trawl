@@ -71,7 +71,7 @@ The API container isn't running or the port is wrong. Run `docker compose logs t
 
 If you configured TRAWL under **Settings → Indexer Proxies → HTTP** rather than as a
 FlareSolverr service, you are using the optional forward proxy. Enable it with
-`MITM_PROXY_ENABLED=true`, recreate the `trawl` service, use port `8192`, and install TRAWL's CA in
+`MITM_ENABLED=true`, recreate the `trawl` service, use port `8192`, and install TRAWL's CA in
 the Prowlarr container for HTTPS targets. See [Proxy client setup](/proxy/client-setup#prowlarr).
 
 **Test succeeds but searches still fail**  

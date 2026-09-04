@@ -37,9 +37,10 @@ MCP_ALLOWED_ORIGINS=https://chat.example.com,https://admin.example.com
 
 ### `REDIS_URL`
 
-**Default:** `redis://localhost:6379`
+**Default:** _(empty — session cache disabled)_
 
-Standard Redis connection URL — TRAWL's cache backend is Redis 8.8. When running inside Docker Compose use the service name:
+Standard Redis connection URL — TRAWL's cache backend is Redis 8.8. Set a non-empty URL to enable
+the session cache. When running inside Docker Compose use the service name:
 
 ```ini
 REDIS_URL=redis://redis:6379
@@ -70,6 +71,22 @@ permanently disable Tier 2; TRAWL continues without the cache and reconnects in 
 
 Delay between background connection attempts. Set it to `0` when Redis is intentionally absent to
 disable retries. The supplied minimal Compose variant does this automatically.
+
+### `REDIS_SESSION_TTL_SECONDS`
+
+**Default:** `3600` (1 hour)
+
+How long solved browser cookies and user-agent state are cached in Redis per domain. After this TTL
+the next protected request triggers a fresh challenge solve and refreshes the cache.
+
+Cloudflare's `cf_clearance` cookie typically has a 30-minute expiry. Setting
+`REDIS_SESSION_TTL_SECONDS` below 1800 wastes cache hits; setting it above 7200 risks replaying
+expired cookies. TRAWL handles an expired cookie by invalidating the cache and falling back to Tier 3.
+
+```ini
+REDIS_SESSION_TTL_SECONDS=3600   # default — safe for most sites
+REDIS_SESSION_TTL_SECONDS=1800   # more conservative
+```
 
 ## Browser Pool
 
@@ -114,15 +131,15 @@ BROWSER_RECYCLE_AFTER_CONTEXTS=8   # default - replace after 8 Tier 3/4 contexts
 BROWSER_RECYCLE_AFTER_CONTEXTS=0   # disable browser recycling entirely
 ```
 
-### `BROWSER_CONTENT_PROCESSES`
+### `BROWSER_MAX_CONTENT_PROCESSES`
 
 **Default:** `2`
 
 Caps Firefox content processes per pooled browser via the `dom.ipc.processCount` Firefox pref. Firefox's default of 8 lets thread count climb when Tier 3 / Tier 4 churn disposable contexts (see #13). The cap bounds the leak at the source without paying the recycle cost. Raise if specific targets fail with empty content (rare).
 
 ```ini
-BROWSER_CONTENT_PROCESSES=2   # default - conservative cap, lowest RAM/CPU
-BROWSER_CONTENT_PROCESSES=4   # raise if CF/Imperva challenges stall
+BROWSER_MAX_CONTENT_PROCESSES=2   # default - conservative cap, lowest RAM/CPU
+BROWSER_MAX_CONTENT_PROCESSES=4   # raise if CF/Imperva challenges stall
 ```
 
 ### `BROWSER_HEADFUL_POOL_SIZE`
@@ -178,20 +195,19 @@ A screenshot is never worth failing a scrape: exceeding any of these bounds leav
 Tier 1 is a plain HTTP fetch and never captures a screenshot. Set `skipHttp: true` if
 you need to force a browser-tier attempt.
 
-## Console, Network and Redirect Capture
+## Console and Network Diagnostics
 
-Only read when a request sets `consoleLogs`, `networkLogs` or `redirectChain` — see
+Only read when a request sets `consoleLogs` or `networkLogs` — see
 [Native API](/api-reference/native-api). Without those flags no listener is attached and
 nothing is buffered.
 
 | Variable | Default | Purpose |
 | --- | ---: | --- |
-| `CAPTURE_MAX_CONSOLE_ENTRIES` | `500` | Console messages kept per page |
-| `CAPTURE_MAX_NETWORK_ENTRIES` | `1000` | Requests kept per page |
-| `CAPTURE_MAX_STRING_CHARS` | `2000` | Longest single console message or URL kept |
-| `CAPTURE_MAX_TOTAL_CHARS` | `1000000` | Total characters kept across both arrays |
-| `CAPTURE_MAX_REDIRECT_ENTRIES` | `50` | URLs kept in the redirect chain |
-| `CAPTURE_SIZES_TIMEOUT_MS` | `2000` | Maximum wait for the browser's per-request byte counts |
+| `DIAGNOSTICS_MAX_CONSOLE_ENTRIES` | `500` | Console messages kept per page |
+| `DIAGNOSTICS_MAX_NETWORK_ENTRIES` | `1000` | Requests kept per page |
+| `DIAGNOSTICS_MAX_STRING_CHARS` | `2000` | Longest single console message or request URL kept |
+| `DIAGNOSTICS_MAX_TOTAL_CHARS` | `1000000` | Total characters kept across both arrays |
+| `DIAGNOSTICS_SIZE_TIMEOUT_MS` | `2000` | Maximum wait for the browser's per-request byte counts |
 
 Anything past a cap is dropped whole rather than truncated, and the number of dropped
 entries is logged once per scrape. A capture failure leaves the field unset and never
@@ -201,6 +217,17 @@ Console messages and request URLs may contain credentials, tokens, personal data
 other sensitive values. Treat diagnostic fields as sensitive output and avoid storing
 or forwarding them unless necessary.
 
+## Redirect Capture
+
+Only read when a request sets `redirectChain`. The tracker records only top-level document URLs;
+subresource redirects are excluded.
+
+| Variable | Default | Purpose |
+| --- | ---: | --- |
+| `REDIRECT_MAX_ENTRIES` | `50` | URLs kept in the redirect chain |
+| `REDIRECT_MAX_URL_CHARS` | `2000` | Longest individual redirect URL kept |
+| `REDIRECT_MAX_TOTAL_CHARS` | `1000000` | Total characters kept across the redirect chain |
+
 ## Response-Body Capture
 
 Only read when a request sets `captureResponses` — see
@@ -209,15 +236,16 @@ body is read.
 
 | Variable | Default | Purpose |
 | --- | ---: | --- |
-| `CAPTURE_MAX_RESPONSE_PATTERNS` | `10` | URL patterns honoured per request |
+| `CAPTURE_MAX_PATTERNS` | `10` | URL patterns honoured per request |
 | `CAPTURE_MAX_RESPONSES` | `5` | Bodies kept per page, in arrival order |
-| `CAPTURE_MAX_RESPONSE_BYTES` | `5242880` | Bytes kept per body; past it the body is trimmed and flagged `truncated` |
-| `CAPTURE_MAX_RESPONSE_TOTAL_BYTES` | `10485760` | Bytes kept across all bodies of one page |
+| `CAPTURE_MAX_BODY_BYTES` | `5242880` | Bytes kept per body; past it the body is trimmed and flagged `truncated` |
+| `CAPTURE_MAX_TOTAL_BYTES` | `10485760` | Bytes kept across all bodies of one page |
 | `CAPTURE_MAX_READ_BYTES` | `10485760` | Largest body this process will read at all; a larger one is reported with an `error` instead of a trimmed prefix |
+| `CAPTURE_MAX_METADATA_CHARS` | `2000` | Longest captured URL, header name, header value, or error kept |
 | `CAPTURE_BODY_TIMEOUT_MS` | `5000` | Maximum wait for in-flight body reads when the capture is drained |
 | `CAPTURE_SETTLE_MS` | `15000` | Default settle window when a request does not set `settleTimeout` |
 | `CAPTURE_MAX_SETTLE_MS` | `60000` | Ceiling a request may ask for; the request's own time budget also caps it |
-| `CAPTURE_SETTLE_IDLE_FLOOR_MS` | `5000` | Network idle is ignored for this long, so a data fetch on a delayed timer is not mistaken for a quiet page |
+| `CAPTURE_IDLE_FLOOR_MS` | `5000` | Network idle is ignored for this long, so a data fetch on a delayed timer is not mistaken for a quiet page |
 
 A response that matched but whose body could not be read is still returned, with `body`
 null and `error` set, so "nothing matched" stays distinguishable from "matched, retrieval
@@ -229,21 +257,24 @@ bodies with a valid `Content-Length` are read. Compressed or unknown-size bodies
 returned with `body: null` and an error. Declared sizes are reserved cumulatively before
 reads start, so concurrent responses cannot exceed the total read budget.
 
-## Session Cache
+## CAPTCHA audio and media tools
 
-### `SESSION_TTL_SECONDS`
+TRAWL uses ffmpeg while solving supported CAPTCHA challenges. reCAPTCHA audio is converted before
+speech recognition, and the GeeTest solver uses it during image processing.
 
-**Default:** `3600` (1 hour)
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `STT_URL` | — | Optional Whisper/OpenAI-compatible transcription endpoint |
+| `STT_API_KEY` | — | Optional bearer token sent only to `STT_URL` |
+| `FFMPEG_PATH` | `ffmpeg` | Executable name or absolute path used by the CAPTCHA solvers |
 
-How long solved browser cookies and user-agent state are cached in Redis per domain. After this TTL
-the next protected request triggers a fresh challenge solve (Tier 3) and refreshes the cache.
+Without `STT_URL`, reCAPTCHA audio uses Google's public speech-recognition endpoint. When `STT_URL`
+is configured, TRAWL sends a multipart `whisper-1` transcription request and adds
+`Authorization: Bearer <STT_API_KEY>` when a key is present.
 
-Cloudflare's `cf_clearance` cookie typically has a 30-minute expiry. Setting `SESSION_TTL_SECONDS` below 1800 wastes cache hits; setting it above 7200 risks replaying expired cookies (TRAWL handles this gracefully by invalidating the cache and falling back to Tier 3).
-
-```ini
-SESSION_TTL_SECONDS=3600   # default — safe for most sites
-SESSION_TTL_SECONDS=1800   # more conservative
-```
+The API container already includes ffmpeg. Bare-metal installations must make `ffmpeg` available on
+`PATH` or set `FFMPEG_PATH`. These values are read only by CAPTCHA solving; ordinary scrapes do not
+contact the configured STT service. Treat `STT_API_KEY` as a secret and avoid committing it to `.env`.
 
 ## Proxies
 
@@ -374,10 +405,15 @@ PORT=9191 docker compose up -d
 ## Forward proxy
 
 The optional general HTTP/HTTPS proxy has its own listener, CA, tier cap, and debug settings.
-See [Proxy Configuration](/proxy/configuration) for all `MITM_PROXY_*` variables and deployment
+See [Proxy Configuration](/proxy/configuration) for all `MITM_*` variables and deployment
 examples.
 
 ---
 
 The repository's [`.env.example`](https://github.com/germondai/trawl/blob/main/.env.example) is the
 canonical copyable environment template.
+
+::: warning Upgrading from an earlier release?
+The configuration namespaces changed without legacy aliases. Follow the complete
+[configuration migration table](/deployment/configuration-migration) before recreating the container.
+:::

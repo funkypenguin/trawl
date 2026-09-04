@@ -11,7 +11,7 @@ creates:
 - `ca.crt` — the root certificate clients install;
 - `ca.key` — the private signing key, which must remain secret.
 
-Both files live in `MITM_PROXY_CA_DIR`. Per-host certificates are generated in memory and signed by
+Both files live in `MITM_CA_DIR`. Per-host certificates are generated in memory and signed by
 this root. Persist the directory so clients only need to install the root once.
 
 ::: danger

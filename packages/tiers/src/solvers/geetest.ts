@@ -11,7 +11,7 @@ import { randomUUID } from "node:crypto"
 import { $ } from "bun"
 import type { Page } from "patchright"
 
-const FFMPEG = process.env.FFMPEG_PATH ?? "ffmpeg"
+const FFMPEG = process.env.FFMPEG_PATH?.trim() || "ffmpeg"
 
 // Initial "Click to verify" button selectors (GeeTest v4 entry point).
 // Use aria-label and specific class — avoid [class*="geetest_btn"] which also matches the icon SVG.

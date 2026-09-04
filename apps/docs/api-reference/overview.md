@@ -36,8 +36,8 @@ Content-Type: application/json
 
 ## Forward proxy
 
-When `MITM_PROXY_ENABLED=true`, TRAWL also listens as an HTTP/HTTPS forward proxy on
-`MITM_PROXY_PORT` (default `8192`). This is a socket-level proxy interface rather than a JSON API
+When `MITM_ENABLED=true`, TRAWL also listens as an HTTP/HTTPS forward proxy on
+`MITM_PORT` (default `8192`). This is a socket-level proxy interface rather than a JSON API
 endpoint. It forwards normal traffic directly and escalates recognized challenge walls through the
 same tier engine as `/scrape`.
 

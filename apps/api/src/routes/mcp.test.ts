@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { PoolExhaustedError } from "@trawl/browser"
 import { ScrapeError } from "@trawl/tiers"
 import type { ScrapeResult } from "@trawl/types"
-import { MCP_HTML_LIMIT, mcpRoute } from "./mcp"
+import { MCP_HTML_MAX_CHARS, mcpRoute } from "./mcp"
 
 const baseResult: ScrapeResult = {
   url: "https://1.1.1.1/final",
@@ -60,7 +60,7 @@ describe("MCP route", () => {
       poolReady: () => true,
       runScrape: async (input) => {
         received = input
-        return { ...baseResult, html: `secret-cookie-${"x".repeat(MCP_HTML_LIMIT)}` }
+        return { ...baseResult, html: `secret-cookie-${"x".repeat(MCP_HTML_MAX_CHARS)}` }
       },
     })
     const response = await app.handle(
@@ -76,7 +76,7 @@ describe("MCP route", () => {
       totalMs: 12,
       truncated: true,
     })
-    expect(body.result.content[0].text.length).toBe(MCP_HTML_LIMIT)
+    expect(body.result.content[0].text.length).toBe(MCP_HTML_MAX_CHARS)
     expect(JSON.stringify(body)).not.toContain('cookie"')
     expect(JSON.stringify(body)).not.toContain("secret-agent")
   })

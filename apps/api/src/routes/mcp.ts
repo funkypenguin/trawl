@@ -10,7 +10,7 @@ import { MCP_ALLOWED_ORIGINS } from "../config"
 import { getDeps, getPool } from "../deps"
 import { assertPublicHttpUrl, createPublicUrlValidator } from "../outbound-policy"
 
-export const MCP_HTML_LIMIT = 50_000
+export const MCP_HTML_MAX_CHARS = 50_000
 
 type RunScrape = (input: {
   url: string
@@ -63,8 +63,8 @@ function createServer(poolReady: () => boolean, runScrape: RunScrape): McpServer
         // A redirect can reveal a policy violation even if the initial URL was public.
         // Reject it from the model output as a second line of defense.
         await assertPublicHttpUrl(result.url)
-        const truncated = result.html.length > MCP_HTML_LIMIT
-        const html = result.html.slice(0, MCP_HTML_LIMIT)
+        const truncated = result.html.length > MCP_HTML_MAX_CHARS
+        const html = result.html.slice(0, MCP_HTML_MAX_CHARS)
         const structuredContent = {
           url: result.url,
           statusCode: result.statusCode,

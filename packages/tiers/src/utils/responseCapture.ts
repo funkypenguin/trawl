@@ -3,16 +3,16 @@ import type { Page, Response } from "patchright"
 import { captureLimit } from "./captureConfig"
 import { isTextContentType } from "./response"
 
-const MAX_PATTERNS = captureLimit(process.env.CAPTURE_MAX_RESPONSE_PATTERNS, 10)
+const MAX_PATTERNS = captureLimit(process.env.CAPTURE_MAX_PATTERNS, 10)
 const MAX_RESPONSES = captureLimit(process.env.CAPTURE_MAX_RESPONSES, 5)
-const MAX_BODY_BYTES = captureLimit(process.env.CAPTURE_MAX_RESPONSE_BYTES, 5_242_880)
-const MAX_TOTAL_BYTES = captureLimit(process.env.CAPTURE_MAX_RESPONSE_TOTAL_BYTES, 10_485_760)
+const MAX_BODY_BYTES = captureLimit(process.env.CAPTURE_MAX_BODY_BYTES, 5_242_880)
+const MAX_TOTAL_BYTES = captureLimit(process.env.CAPTURE_MAX_TOTAL_BYTES, 10_485_760)
 const MAX_READ_BYTES = captureLimit(process.env.CAPTURE_MAX_READ_BYTES, 10_485_760)
 const BODY_TIMEOUT_MS = captureLimit(process.env.CAPTURE_BODY_TIMEOUT_MS, 5_000)
 const SETTLE_MS = captureLimit(process.env.CAPTURE_SETTLE_MS, 15_000)
 const MAX_SETTLE_MS = captureLimit(process.env.CAPTURE_MAX_SETTLE_MS, 60_000)
-const IDLE_FLOOR_MS = captureLimit(process.env.CAPTURE_SETTLE_IDLE_FLOOR_MS, 5_000)
-const MAX_STRING_CHARS = captureLimit(process.env.CAPTURE_MAX_STRING_CHARS, 2_000)
+const IDLE_FLOOR_MS = captureLimit(process.env.CAPTURE_IDLE_FLOOR_MS, 5_000)
+const MAX_STRING_CHARS = captureLimit(process.env.CAPTURE_MAX_METADATA_CHARS, 2_000)
 
 const NEVER = new Promise<void>(() => {})
 const COMPRESSED_ENCODINGS = new Set(["gzip", "br", "deflate", "zstd"])

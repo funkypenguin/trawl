@@ -1,12 +1,12 @@
 import { createApiApp } from "./app"
 import {
-  MITM_PROXY_ALWAYS_SCRAPE,
-  MITM_PROXY_CA_DIR,
-  MITM_PROXY_DEBUG,
-  MITM_PROXY_ENABLED,
-  MITM_PROXY_HOST,
-  MITM_PROXY_MAX_TIER,
-  MITM_PROXY_PORT,
+  MITM_ALWAYS_SCRAPE,
+  MITM_CA_DIR,
+  MITM_DEBUG,
+  MITM_ENABLED,
+  MITM_HOST,
+  MITM_MAX_TIER,
+  MITM_PORT,
   POOL_SIZE,
   PORT,
 } from "./config"
@@ -24,15 +24,15 @@ const poolReady = initPool()
 
 // Tier 0 does not need a browser, and browser-backed requests already have a
 // bounded acquire queue. Start accepting proxy traffic while the pool warms.
-if (MITM_PROXY_ENABLED) {
+if (MITM_ENABLED) {
   state.proxyHandle = startMitmProxy({
-    port: MITM_PROXY_PORT,
-    host: MITM_PROXY_HOST,
-    caDir: MITM_PROXY_CA_DIR,
+    port: MITM_PORT,
+    host: MITM_HOST,
+    caDir: MITM_CA_DIR,
     deps: getDeps(),
-    maxTier: MITM_PROXY_MAX_TIER,
-    alwaysScrape: MITM_PROXY_ALWAYS_SCRAPE,
-    debug: MITM_PROXY_DEBUG,
+    maxTier: MITM_MAX_TIER,
+    alwaysScrape: MITM_ALWAYS_SCRAPE,
+    debug: MITM_DEBUG,
   })
 }
 

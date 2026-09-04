@@ -3,8 +3,8 @@ import type { AcquireOptions, OrchestratorDeps } from "@trawl/tiers"
 import type { SessionData } from "@trawl/types"
 import {
   ACQUIRE_TIMEOUT_MS,
+  BROWSER_MAX_CONTENT_PROCESSES,
   CLOSE_TIMEOUT_MS,
-  CONTENT_PROCESSES,
   HEADFUL_POOL_SIZE,
   LAUNCH_TIMEOUT_MS,
   POOL_SIZE,
@@ -12,9 +12,9 @@ import {
   RECYCLE_AFTER_TEMPORARY_CONTEXTS,
   REDIS_CONNECT_TIMEOUT_MS,
   REDIS_RETRY_DELAY_MS,
+  REDIS_SESSION_TTL_SECONDS,
   REDIS_URL,
   residentialProxyPool,
-  SESSION_TTL,
   STALL_TIMEOUT_MS,
 } from "./config"
 
@@ -93,16 +93,22 @@ export class SessionCacheRecovery {
   }
 }
 
-const sessionCacheRecovery = new SessionCacheRecovery({
-  createCache: () => new SessionCache({ redisUrl: REDIS_URL, ttlSeconds: SESSION_TTL }),
-  connectTimeoutMs: REDIS_CONNECT_TIMEOUT_MS,
-  retryDelayMs: REDIS_RETRY_DELAY_MS,
-  onConnected: () => console.log("[api] session cache connected  (Tier 2 fast-path enabled)"),
-  onUnavailable: (err) => {
-    const retry = REDIS_RETRY_DELAY_MS > 0 ? `; retrying in ${REDIS_RETRY_DELAY_MS}ms` : ""
-    console.warn(`[api] session cache unavailable — Tier 2 disabled${retry}:`, err instanceof Error ? err.message : err)
-  },
-})
+const redisUrl = REDIS_URL
+const sessionCacheRecovery = redisUrl
+  ? new SessionCacheRecovery({
+      createCache: () => new SessionCache({ redisUrl, ttlSeconds: REDIS_SESSION_TTL_SECONDS }),
+      connectTimeoutMs: REDIS_CONNECT_TIMEOUT_MS,
+      retryDelayMs: REDIS_RETRY_DELAY_MS,
+      onConnected: () => console.log("[api] session cache connected  (Tier 2 fast-path enabled)"),
+      onUnavailable: (err) => {
+        const retry = REDIS_RETRY_DELAY_MS > 0 ? `; retrying in ${REDIS_RETRY_DELAY_MS}ms` : ""
+        console.warn(
+          `[api] session cache unavailable — Tier 2 disabled${retry}:`,
+          err instanceof Error ? err.message : err,
+        )
+      },
+    })
+  : undefined
 
 interface InitPoolOptions {
   poolSize?: number
@@ -114,10 +120,10 @@ interface InitPoolOptions {
 export const getPool = () => state.pool
 export const getHeadfulPool = () => state.headfulPool
 
-const initSessionCache = (): Promise<void> => sessionCacheRecovery.start()
+const initSessionCache = (): Promise<void> => sessionCacheRecovery?.start() ?? Promise.resolve()
 
 export const shutdownPools = async (): Promise<void> => {
-  await Promise.all([sessionCacheRecovery.stop(), state.pool?.shutdown(), state.headfulPool?.shutdown()])
+  await Promise.all([sessionCacheRecovery?.stop(), state.pool?.shutdown(), state.headfulPool?.shutdown()])
 }
 
 export const initPool = async ({
@@ -130,7 +136,7 @@ export const initPool = async ({
     poolSize,
     acquireTimeoutMs: ACQUIRE_TIMEOUT_MS,
     recycleAfterTemporaryContexts: RECYCLE_AFTER_TEMPORARY_CONTEXTS,
-    contentProcesses: CONTENT_PROCESSES,
+    contentProcesses: BROWSER_MAX_CONTENT_PROCESSES,
     stallAfterMs: STALL_TIMEOUT_MS,
     closeTimeoutMs: CLOSE_TIMEOUT_MS,
     launchTimeoutMs: LAUNCH_TIMEOUT_MS,
@@ -142,7 +148,7 @@ export const initPool = async ({
       poolSize: headfulPoolSize,
       acquireTimeoutMs: ACQUIRE_TIMEOUT_MS,
       recycleAfterTemporaryContexts: RECYCLE_AFTER_TEMPORARY_CONTEXTS,
-      contentProcesses: CONTENT_PROCESSES,
+      contentProcesses: BROWSER_MAX_CONTENT_PROCESSES,
       virtualDisplay: true,
       label: "pool:headful",
       stallAfterMs: STALL_TIMEOUT_MS,
@@ -192,17 +198,17 @@ export const getDeps = (): OrchestratorDeps => {
     },
     loadSession: (d: string) =>
       sessionCacheRecovery
-        .current()
+        ?.current()
         ?.load(d)
         .catch(() => undefined) ?? Promise.resolve(undefined),
     saveSession: (d: string, data: SessionData) =>
       sessionCacheRecovery
-        .current()
+        ?.current()
         ?.save(d, data)
         .catch(() => {}) ?? Promise.resolve(),
     invalidateSession: (d: string) =>
       sessionCacheRecovery
-        .current()
+        ?.current()
         ?.invalidate(d)
         .catch(() => {}) ?? Promise.resolve(),
     proxyPool,

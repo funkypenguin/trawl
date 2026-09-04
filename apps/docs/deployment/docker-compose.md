@@ -118,21 +118,23 @@ TRAWL and Redis.
 | `BROWSER_POOL_SIZE`              | `3`                  | Warm browsers; supplied minimal/cached Compose files override this to `1` |
 | `BROWSER_ACQUIRE_TIMEOUT_MS`     | `15000`              | How long `acquire()` polls for a free browser before returning HTTP 429 |
 | `BROWSER_RECYCLE_AFTER_CONTEXTS` | `8`                  | Rolling-replace after this many Tier 3/4 contexts; `0` disables it      |
+| `BROWSER_MAX_CONTENT_PROCESSES`  | `2`                  | Maximum Firefox content processes per browser                           |
 | `REDIS_URL`                      | `redis://redis:6379` | Redis connection (set automatically in compose)                         |
+| `REDIS_SESSION_TTL_SECONDS`      | `3600`               | Lifetime of cached sessions                                             |
 | `REDIS_CONNECT_TIMEOUT_MS`       | `5000`               | Maximum time for each Redis connection attempt                          |
 | `REDIS_RETRY_DELAY_MS`           | `5000`               | Background reconnect delay; `0` disables retry                          |
 | `PROXY_URL`                      | —                    | Optional Tier 3 datacenter proxy or pool                                |
 | `RESIDENTIAL_PROXY_URL`          | —                    | Enables Tier 4 proxy escalation                                         |
-| `MITM_PROXY_ENABLED`             | `false`              | Starts the general HTTP/HTTPS proxy                                     |
-| `MITM_PROXY_PORT`                | `8192`               | Proxy listen and published port                                         |
-| `MITM_PROXY_HOST`                | `0.0.0.0`            | Proxy bind address                                                      |
-| `MITM_PROXY_CA_DIR`              | `/data/proxy-ca`     | Persistent root CA directory                                            |
-| `MITM_PROXY_ALWAYS_SCRAPE`       | `false`              | Skip proxy Tier 0 and enter the scraper immediately                     |
+| `MITM_ENABLED`                   | `false`              | Starts the general HTTP/HTTPS proxy                                     |
+| `MITM_PORT`                      | `8192`               | Proxy listen and published port                                         |
+| `MITM_HOST`                      | `0.0.0.0`            | Proxy bind address                                                      |
+| `MITM_CA_DIR`                    | `/data/proxy-ca`     | Persistent root CA directory                                            |
+| `MITM_ALWAYS_SCRAPE`             | `false`              | Skip proxy Tier 0 and enter the scraper immediately                     |
 | `MCP_ENABLED`                    | `false`              | Enables the Streamable HTTP endpoint at `/mcp`                          |
 | `MCP_ALLOWED_ORIGINS`            | —                    | Comma-separated allowed browser origins                                 |
 
 All supplied Compose files publish port `8192` and mount the `trawl_proxy_ca` volume. The listener
-does not start until `MITM_PROXY_ENABLED=true`. See [Proxy Configuration](/proxy/configuration).
+does not start until `MITM_ENABLED=true`. See [Proxy Configuration](/proxy/configuration).
 
 All supplied Compose files also pass `PROXY_URL`, `PROXY_LIST_FILE`, `RESIDENTIAL_PROXY_URL`, and
 `RESIDENTIAL_PROXY_LIST_FILE` from the local environment or `.env` file. For a single residential
@@ -142,6 +144,17 @@ endpoint:
 # .env
 RESIDENTIAL_PROXY_URL=http://user:pass@residential.example.com:8080
 ```
+
+The files explicitly pass every supported TRAWL runtime variable, including browser, screenshot,
+diagnostics, redirect, response-capture, STT, and ffmpeg tuning. Docker Compose uses `.env` for
+interpolation but does not otherwise expose arbitrary host variables to the container. Inspect the
+resolved values with `docker compose config` and see the
+[configuration migration guide](/deployment/configuration-migration) when upgrading.
+
+There are two deliberate routing exceptions. `PORT` changes the published host port while the API
+continues listening on container port `8191`. The Redis-backed variants always use their bundled
+`redis` service; the minimal variant accepts an optional external `REDIS_URL` and otherwise disables
+the cache.
 
 For supported endpoint formats, pools, and mounted list files, see
 [Configuration → Proxies](/getting-started/configuration#proxies).

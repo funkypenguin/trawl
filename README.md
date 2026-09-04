@@ -143,15 +143,15 @@ cookie isn't portable. For those indexers, enable TRAWL's forward proxy and add 
 Prowlarr as an **HTTP proxy**:
 
 ```env
-MITM_PROXY_ENABLED=true
-MITM_PROXY_PORT=8192
-MITM_PROXY_CA_DIR=/data/proxy-ca   # persist the CA (mount a volume)
-MITM_PROXY_MAX_TIER=4              # cap escalation (e.g. 3 to stay off residential)
-MITM_PROXY_ALWAYS_SCRAPE=false     # opt in to bypass the proxy's direct Tier 0 probe
+MITM_ENABLED=true
+MITM_PORT=8192
+MITM_CA_DIR=/data/proxy-ca   # persist the CA (mount a volume)
+MITM_MAX_TIER=4              # cap escalation (e.g. 3 to stay off residential)
+MITM_ALWAYS_SCRAPE=false     # opt in to bypass the proxy's direct Tier 0 probe
 ```
 
 By default the listener binds `0.0.0.0` so clients on a Docker bridge network can reach
-it; set `MITM_PROXY_HOST=127.0.0.1` to restrict it to loopback on a bare-metal host.
+it; set `MITM_HOST=127.0.0.1` to restrict it to loopback on a bare-metal host.
 
 1. Install the proxy's CA into the client's trust store so it accepts the per-host certs:
    `curl http://<trawl-host>:8191/proxy-ca.crt` → add to the Prowlarr container's CA store
@@ -175,7 +175,7 @@ supported traffic, limitations, CA installation, and client examples.
 ### Installing the proxy CA certificate
 
 The proxy self-generates a root CA on first run. Its certificate and private key are persisted
-under `MITM_PROXY_CA_DIR` (default `/data/proxy-ca`). Per-host certificates are minted and cached
+under `MITM_CA_DIR` (default `/data/proxy-ca`). Per-host certificates are minted and cached
 in memory while TRAWL runs; they do not need separate installation because they are signed by the
 persistent root. Every client that uses the proxy must trust that root. Without it, HTTPS fails with
 `ERR_CERT_AUTHORITY_INVALID` (browsers) or `PKIX path building failed` (Java).
@@ -297,7 +297,7 @@ Get-ChildItem Cert:\LocalMachine\Root | Where-Object { $_.Subject -like "*TRAWL 
 
 Every installation method has a symmetric removal path. Search your trust store for
 `TRAWL MITM Proxy CA` (the CA's CN) and delete that entry. The CA certificate and key also live at
-`<MITM_PROXY_CA_DIR>/ca.crt` and `ca.key` on the TRAWL host. Deleting either causes TRAWL to
+`<MITM_CA_DIR>/ca.crt` and `ca.key` on the TRAWL host. Deleting either causes TRAWL to
 generate a new root on its next start, so existing clients must install the new certificate.
 
 ## Tiers
@@ -393,9 +393,9 @@ for pool and mounted-file examples.
 | `BROWSER_POOL_SIZE`              | `3`                      | Warm Camoufox Firefox instances                                                     |
 | `BROWSER_ACQUIRE_TIMEOUT_MS`     | `15000`                  | How long `acquire()` polls for a free browser before HTTP 429 is returned           |
 | `BROWSER_RECYCLE_AFTER_CONTEXTS` | `8`                      | Rolling-replace after this many Tier 3/4 contexts; set `0` to disable               |
-| `BROWSER_CONTENT_PROCESSES`      | `2`                      | Cap Firefox content processes per browser (`dom.ipc.processCount`); lowers RAM/CPU  |
-| `SESSION_TTL_SECONDS`            | `3600`                   | Redis session cache TTL (seconds)                                                   |
-| `REDIS_URL`                      | `redis://localhost:6379` | Redis connection string                                                             |
+| `BROWSER_MAX_CONTENT_PROCESSES`  | `2`                      | Cap Firefox content processes per browser (`dom.ipc.processCount`); lowers RAM/CPU  |
+| `REDIS_SESSION_TTL_SECONDS`      | `3600`                   | Redis session cache TTL (seconds)                                                   |
+| `REDIS_URL`                      | —                        | Redis connection string; empty or unset disables the session cache                   |
 | `REDIS_CONNECT_TIMEOUT_MS`       | `5000`                   | Maximum time for each Redis connection attempt                                      |
 | `REDIS_RETRY_DELAY_MS`           | `5000`                   | Delay before reconnecting after startup failure; `0` disables retry                 |
 | `PROXY_URL`                      | —                        | Optional Tier 3 HTTP or SOCKS5 proxy, or comma-separated pool                       |
@@ -404,13 +404,17 @@ for pool and mounted-file examples.
 | `RESIDENTIAL_PROXY_LIST_FILE`    | —                        | File containing one Tier 4 proxy URL per line                                       |
 | `STT_URL`                        | —                        | Local Whisper endpoint for reCAPTCHA (optional)                                     |
 | `PORT`                           | `8191`                   | API listen port                                                                     |
-| `MITM_PROXY_ENABLED`             | `false`                  | Enable the challenge-bypassing HTTP/HTTPS proxy                                     |
-| `MITM_PROXY_PORT`                | `8192`                   | Forward-proxy listen port                                                           |
-| `MITM_PROXY_HOST`                | `0.0.0.0`                | Bind address; `127.0.0.1` for loopback-only                                         |
-| `MITM_PROXY_CA_DIR`              | `/data/proxy-ca`         | Persistent root CA certificate and private-key directory                            |
-| `MITM_PROXY_MAX_TIER`            | `4`                      | Cap escalation used by the proxy (e.g. `3` to stay off residential)                 |
-| `MITM_PROXY_ALWAYS_SCRAPE`       | `false`                  | Skip proxy Tier 0; disables the direct media/large-file streaming path               |
-| `MITM_PROXY_DEBUG`               | `false`                  | Log one line per proxied request (errors are always logged)                         |
+| `MITM_ENABLED`                   | `false`                  | Enable the challenge-bypassing HTTP/HTTPS proxy                                     |
+| `MITM_PORT`                      | `8192`                   | Forward-proxy listen port                                                           |
+| `MITM_HOST`                      | `0.0.0.0`                | Bind address; `127.0.0.1` for loopback-only                                         |
+| `MITM_CA_DIR`                    | `/data/proxy-ca`         | Persistent root CA certificate and private-key directory                            |
+| `MITM_MAX_TIER`                  | `4`                      | Cap escalation used by the proxy (e.g. `3` to stay off residential)                 |
+| `MITM_ALWAYS_SCRAPE`             | `false`                  | Skip proxy Tier 0; disables the direct media/large-file streaming path               |
+| `MITM_DEBUG`                     | `false`                  | Log one line per proxied request (errors are always logged)                         |
+
+Upgrading from an earlier release requires renaming several environment variables. See the
+[configuration migration guide](apps/docs/deployment/configuration-migration.md) for the complete
+old-to-new mapping and Redis opt-in behavior.
 
 ## Stack
 

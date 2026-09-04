@@ -57,8 +57,8 @@ ARG TARGETARCH
 # MacIntel -> "macos"), and Camoufox spoofs that OS's font list with it. Dropping those
 # bundles therefore leaves a browser advertising fonts whose files are gone: every glyph
 # renders as a tofu box, and the fingerprint is self-inconsistent for anti-bot scoring.
-# Set KEEP_SPOOFED_OS_FONTS=1 to keep them (+891MB) when rendered output matters.
-ARG KEEP_SPOOFED_OS_FONTS=0
+# Set CAMOUFOX_KEEP_SPOOFED_OS_FONTS=1 to keep them (+891MB) when rendered output matters.
+ARG CAMOUFOX_KEEP_SPOOFED_OS_FONTS=0
 RUN --mount=type=secret,id=GITHUB_TOKEN,env=GITHUB_TOKEN \
     case "$TARGETARCH" in \
       amd64) ZIP="camoufox-152.0.4-beta.28-lin.x86_64.zip"; SHA256="924f3109ccd6d47cd6a0384d67a345fadf975d48b6319f8dbbd5954c588982bd" ;; \
@@ -73,7 +73,7 @@ RUN --mount=type=secret,id=GITHUB_TOKEN,env=GITHUB_TOKEN \
     rm /tmp/camoufox.zip && \
     printf '{"version":"152.0.4","release":"beta.28"}\n' > /opt/camoufox/version.json && \
     chmod -R 755 /opt/camoufox && \
-    if [ "$KEEP_SPOOFED_OS_FONTS" != "1" ]; then \
+    if [ "$CAMOUFOX_KEEP_SPOOFED_OS_FONTS" != "1" ]; then \
       rm -rf /opt/camoufox/fonts/macos /opt/camoufox/fonts/windows; \
     fi
 

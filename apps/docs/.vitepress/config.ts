@@ -87,6 +87,7 @@ export default defineConfig({
         items: [
           { text: "Docker Compose", link: "/deployment/docker-compose" },
           { text: "Standalone Containers", link: "/deployment/standalone" },
+          { text: "Configuration Migration", link: "/deployment/configuration-migration" },
           { text: "Troubleshooting", link: "/deployment/troubleshooting" },
         ],
       },
