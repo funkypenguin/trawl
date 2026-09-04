@@ -22,7 +22,7 @@ interface SessionData {
 }
 ```
 
-TTL: `SESSION_TTL_SECONDS` (default 3600 seconds / 1 hour).
+TTL: `REDIS_SESSION_TTL_SECONDS` (default 3600 seconds / 1 hour).
 
 ## Session key
 
@@ -42,7 +42,7 @@ Subdomains have separate sessions because WAF and application cookies can differ
 Tier 3 succeeds
   │
   ├── extract cookies from browser context
-  ├── REDIS SET session:hostname → JSON  EX SESSION_TTL_SECONDS
+  ├── REDIS SET session:hostname → JSON  EX REDIS_SESSION_TTL_SECONDS
   │
   └── next request to same domain:
         REDIS GET session:hostname
@@ -63,10 +63,13 @@ This handles provider cookies expiring or being rejected before the Redis TTL en
 
 TRAWL's cache backend is Redis 8.8. TRAWL talks to it with `new RedisClient(REDIS_URL)` from Bun's native Redis client (not ioredis).
 
+The cache is optional. When `REDIS_URL` is empty or unset, TRAWL does not create a Redis client and
+Tier 2 remains disabled.
+
 Each connection attempt is bounded by `REDIS_CONNECT_TIMEOUT_MS` (default 5 seconds). If Redis is
 not ready, scraping continues without Tier 2 while TRAWL retries in the background every
-`REDIS_RETRY_DELAY_MS` (default 5 seconds). Set the retry delay to `0` when Redis is intentionally
-absent.
+`REDIS_RETRY_DELAY_MS` (default 5 seconds). Set the retry delay to `0` to disable reconnects after a
+configured Redis endpoint becomes unavailable.
 
 ```typescript
 import { RedisClient } from 'bun'

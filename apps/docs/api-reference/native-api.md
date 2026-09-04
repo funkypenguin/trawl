@@ -96,7 +96,7 @@ interface CapturedResponseEntry {
   headers: Record<string, string>
   body: string | null          // text, or base64 when binary/unknown; null when unreadable
   base64Encoded: boolean
-  truncated: boolean           // body trimmed to CAPTURE_MAX_RESPONSE_BYTES
+  truncated: boolean           // body trimmed to CAPTURE_MAX_BODY_BYTES
   error?: string               // why the body is null (read failed, budget spent, ...)
 }
 

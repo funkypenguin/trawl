@@ -69,6 +69,20 @@ docker build -f apps/api/Dockerfile.baseline -t trawl:baseline .
 docker run -d --name trawl -p 8191:8191 --shm-size=1gb trawl:baseline
 ```
 
+Both API Dockerfiles omit the spoofed macOS and Windows font bundles by default. To retain them for
+rendering that must match those Camoufox operating-system profiles, build with:
+
+```bash
+docker build \
+  --build-arg CAMOUFOX_KEEP_SPOOFED_OS_FONTS=1 \
+  -f apps/api/Dockerfile \
+  -t trawl .
+```
+
+This adds approximately 891 MB to the image. Other build arguments pin or validate bundled
+dependencies and normally should not be overridden: `UBO_VERSION`, `UBO_AMO_FILE_ID`, `UBO_SHA256`,
+`GEOLITE_CITY_MIN_BYTES`, and (for the baseline image) `BUN_VERSION`.
+
 ::: warning Build context
 Both API Dockerfiles (`apps/api/Dockerfile` and `apps/api/Dockerfile.baseline`) require the **repo root** as the build context because they copy workspace packages (`packages/types`, `packages/browser`, `packages/tiers`). Always run `docker build` from the repo root with `-f apps/api/Dockerfile` (or `-f apps/api/Dockerfile.baseline`).
 :::

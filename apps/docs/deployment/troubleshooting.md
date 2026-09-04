@@ -101,7 +101,7 @@ docker compose up -d --force-recreate
 **Causes:**
 
 1. **Redis session data is not persisting** — Run `docker compose exec redis redis-cli keys "session:*"` after a successful scrape. If empty, the session cache write is failing. Check API logs for Redis connection errors.
-2. **`SESSION_TTL_SECONDS` set too low** — If it's shorter than Cloudflare's challenge interval, the cache expires before the next request.
+2. **`REDIS_SESSION_TTL_SECONDS` set too low** — If it's shorter than Cloudflare's challenge interval, the cache expires before the next request.
 3. **Domain key mismatch** — The key is the hostname only. `sub.example.com` and `www.example.com` are separate sessions.
 
 ## POST /v1 returns HTTP 429 with `status: "error"`
@@ -140,8 +140,8 @@ docker compose up -d --force-recreate
 First identify which TRAWL interface Prowlarr is using:
 
 - **FlareSolverr integration:** configure `http://trawl:8191` under **Settings → Indexers →
-  FlareSolverr**. Port `8191` is the API and does not require `MITM_PROXY_ENABLED`.
-- **HTTP indexer proxy:** port `8192` is disabled by default. Set `MITM_PROXY_ENABLED=true`, recreate
+  FlareSolverr**. Port `8191` is the API and does not require `MITM_ENABLED`.
+- **HTTP indexer proxy:** port `8192` is disabled by default. Set `MITM_ENABLED=true`, recreate
   the TRAWL service, and configure an HTTP proxy with host `trawl` and port `8192`. HTTPS targets
   also require TRAWL's CA in the Prowlarr container trust store; see
   [Proxy client setup](/proxy/client-setup#prowlarr).

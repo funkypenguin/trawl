@@ -125,7 +125,7 @@ optional HTTP/HTTPS forward proxy and it is disabled by default.
 
 ```
 localhost:8191  →  TRAWL API  (FlareSolverr-compatible + native endpoint)
-localhost:8192  →  HTTP/HTTPS forward proxy (when MITM_PROXY_ENABLED=true)
+localhost:8192  →  HTTP/HTTPS forward proxy (when MITM_ENABLED=true)
 ```
 
 To stop everything:

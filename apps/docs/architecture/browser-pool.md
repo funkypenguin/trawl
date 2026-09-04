@@ -45,7 +45,7 @@ new BrowserPool({
   acquireTimeoutMs: 15000,    // BROWSER_ACQUIRE_TIMEOUT_MS — 15s default
   pollIntervalMs: 100,        // how often to re-check for an idle browser
   recycleAfterTemporaryContexts: 8,
-  contentProcesses: 2,        // BROWSER_CONTENT_PROCESSES — caps Firefox content procs
+  contentProcesses: 2,        // BROWSER_MAX_CONTENT_PROCESSES — caps Firefox content procs
   stallAfterMs: 180000,       // BROWSER_STALL_TIMEOUT_MS
   closeTimeoutMs: 10000,      // BROWSER_CLOSE_TIMEOUT_MS
   launchTimeoutMs: 90000,     // BROWSER_LAUNCH_TIMEOUT_MS
