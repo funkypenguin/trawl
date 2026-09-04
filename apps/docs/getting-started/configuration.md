@@ -13,9 +13,10 @@ All configuration is via environment variables. Copy `.env.example` to `.env` an
 
 **Default:** `false`
 
-Enables the Streamable HTTP endpoint at `POST/GET /mcp`. It exposes one read-only
-`scrape_url` tool and does not add web search, ranking, or result discovery. Keep the
-endpoint on a trusted private network; this first version does not provide authentication.
+Enables the Streamable HTTP endpoint at `POST/GET /mcp`. It exposes read-only tools
+for readable content, HTML, screenshots and browser diagnostics. It does not add web
+search, ranking or result discovery. Keep the endpoint on a trusted private network;
+the endpoint does not provide authentication.
 
 ```ini
 MCP_ENABLED=true
