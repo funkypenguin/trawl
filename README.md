@@ -118,11 +118,12 @@ curl -X POST http://localhost:8191/scrape \
   -d '{"url":"https://nowsecure.nl","maxTimeout":60000}'
 ```
 
-### MCP scraping tool (`/mcp`)
+### MCP tools (`/mcp`)
 
-Set `MCP_ENABLED=true` to expose TRAWL's client-independent Streamable HTTP
-`scrape_url` tool to any MCP-compatible AI application or agent. It loads known
-public URLs; it does not provide web search or ranking. See the
+Set `MCP_ENABLED=true` to expose TRAWL's client-independent Streamable HTTP tools
+for readable content, HTML, screenshots and browser diagnostics to any
+MCP-compatible AI application or agent. They load known public URLs; TRAWL does not
+provide web search or ranking. See the
 [MCP integration guide](./apps/docs/integrations/mcp.md).
 
 ### Connect Prowlarr / Jackett

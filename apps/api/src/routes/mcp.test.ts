@@ -28,7 +28,7 @@ function rpc(method: string, params?: unknown, id = 1): Request {
 }
 
 describe("MCP route", () => {
-  test("initializes and lists only scrape_url", async () => {
+  test("initializes and lists the focused tool set with the compatibility alias", async () => {
     const app = mcpRoute({ poolReady: () => true, runScrape: async () => baseResult })
     const initialized = await app.handle(
       rpc("initialize", {
@@ -43,7 +43,13 @@ describe("MCP route", () => {
     const listed = await app.handle(rpc("tools/list"))
     expect(listed.status).toBe(200)
     const body = await listed.json()
-    expect(body.result.tools.map((tool: { name: string }) => tool.name)).toEqual(["scrape_url"])
+    expect(body.result.tools.map((tool: { name: string }) => tool.name)).toEqual([
+      "scrape",
+      "scrape_url",
+      "read",
+      "screenshot",
+      "inspect",
+    ])
   })
 
   test("exposes the Streamable HTTP GET channel", async () => {
@@ -75,10 +81,90 @@ describe("MCP route", () => {
       contentType: "text/html; charset=utf-8",
       totalMs: 12,
       truncated: true,
+      sessionCached: true,
+      timings: baseResult.timings,
     })
     expect(body.result.content[0].text.length).toBe(MCP_HTML_MAX_CHARS)
     expect(JSON.stringify(body)).not.toContain('cookie"')
     expect(JSON.stringify(body)).not.toContain("secret-agent")
+  })
+
+  test("extracts readable markdown with metadata and a caller-controlled limit", async () => {
+    const app = mcpRoute({
+      poolReady: () => true,
+      runScrape: async () => ({
+        ...baseResult,
+        html: `<!doctype html><html lang="en"><head><title>Ignored shell title</title></head><body><article><h1>Useful title</h1><p>${"Readable content ".repeat(40)}</p></article></body></html>`,
+      }),
+    })
+    const response = await app.handle(
+      rpc("tools/call", {
+        name: "read",
+        arguments: { url: "https://1.1.1.1/article", format: "markdown", maxCharacters: 80 },
+      }),
+    )
+    const result = (await response.json()).result
+    expect(result.isError).toBeUndefined()
+    expect(result.content[0].text).toContain("Useful title")
+    expect(result.content[0].text.length).toBe(80)
+    expect(result.structuredContent).toMatchObject({ format: "markdown", characters: 80, truncated: true })
+  })
+
+  test("returns screenshots as MCP image content and forces a browser tier", async () => {
+    let received: unknown
+    const app = mcpRoute({
+      poolReady: () => true,
+      runScrape: async (input) => {
+        received = input
+        return { ...baseResult, screenshot: "aGVsbG8=" }
+      },
+    })
+    const response = await app.handle(
+      rpc("tools/call", { name: "screenshot", arguments: { url: "https://1.1.1.1", maxTier: 3 } }),
+    )
+    const result = (await response.json()).result
+    expect(received).toEqual({ url: "https://1.1.1.1", maxTier: 3, skipHttp: true, screenshot: true })
+    expect(result.content[0]).toEqual({ type: "image", data: "aGVsbG8=", mimeType: "image/jpeg" })
+    expect(result.structuredContent.mimeType).toBe("image/jpeg")
+  })
+
+  test("returns browser diagnostics while redacting URL credentials and query strings", async () => {
+    let received: unknown
+    const app = mcpRoute({
+      poolReady: () => true,
+      runScrape: async (input) => {
+        received = input
+        return {
+          ...baseResult,
+          consoleLogs: [{ level: "SEVERE", message: "boom", timestamp: 1, source: "error" }],
+          networkLogs: [
+            {
+              name: "https://user:secret@example.com/api?token=secret#part",
+              entryType: "resource",
+              startTime: 1,
+              duration: 2,
+              initiatorType: "fetch",
+              transferSize: 3,
+              encodedBodySize: 2,
+              decodedBodySize: null,
+            },
+          ],
+          redirectChain: ["https://example.com/start?token=secret", "https://example.com/final#private"],
+        }
+      },
+    })
+    const response = await app.handle(rpc("tools/call", { name: "inspect", arguments: { url: "https://1.1.1.1" } }))
+    const result = (await response.json()).result
+    expect(received).toEqual({
+      url: "https://1.1.1.1",
+      skipHttp: true,
+      consoleLogs: true,
+      networkLogs: true,
+      redirectChain: true,
+    })
+    expect(result.structuredContent.networkLogs[0].name).toBe("https://example.com/api")
+    expect(result.structuredContent.redirectChain).toEqual(["https://example.com/start", "https://example.com/final"])
+    expect(JSON.stringify(result)).not.toContain("secret")
   })
 
   test("rejects extra arguments, private targets, and disallowed origins", async () => {
