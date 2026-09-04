@@ -24,7 +24,7 @@ describe("MCP opt-in registration", () => {
     try {
       await client.connect(new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${server.port}/mcp`)))
       const tools = await client.listTools()
-      expect(tools.tools.map((tool) => tool.name)).toEqual(["scrape_url"])
+      expect(tools.tools.map((tool) => tool.name)).toEqual(["scrape", "scrape_url", "read", "screenshot", "inspect"])
     } finally {
       await client.close()
       server.stop(true)
