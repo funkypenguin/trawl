@@ -43,9 +43,9 @@ RUN bun install --frozen-lockfile --production --omit=dev --linker=hoisted \
 FROM oven/bun:1.4.0 AS camoufox
 ENV CAMOUFOX_INSTALL_DIR=/opt/camoufox
 
-ARG UBO_VERSION=1.73.0
-ARG UBO_AMO_FILE_ID=4940584
-ARG UBO_SHA256=bccc51a773150af4af6e1fd62c7bfdeb7238b79ff2381b998fa9f2e38f64786a
+ARG UBO_VERSION=1.74.0
+ARG UBO_AMO_FILE_ID=4981431
+ARG UBO_SHA256=175756d74468c9ba45863f7fc333d3be670f82d5b066314e915814dd547d1652
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl unzip ca-certificates && rm -rf /var/lib/apt/lists/*
@@ -61,17 +61,17 @@ ARG TARGETARCH
 ARG CAMOUFOX_KEEP_SPOOFED_OS_FONTS=0
 RUN --mount=type=secret,id=GITHUB_TOKEN,env=GITHUB_TOKEN \
     case "$TARGETARCH" in \
-      amd64) ZIP="camoufox-152.0.4-beta.28-lin.x86_64.zip"; SHA256="924f3109ccd6d47cd6a0384d67a345fadf975d48b6319f8dbbd5954c588982bd" ;; \
-      arm64) ZIP="camoufox-152.0.4-beta.28-lin.arm64.zip"; SHA256="3a105a2fc929e80a79b4b7fce2c93ed62c4fb2c877f3c1ed2a5d66a1c4fe968f" ;; \
+      amd64) ZIP="camoufox-152.0.4-beta.29-lin.x86_64.zip"; SHA256="1bea4b55a51c88e82dc7d426d9c75093d942d2afc8c911cb8fc78ebf723d686c" ;; \
+      arm64) ZIP="camoufox-152.0.4-beta.29-lin.arm64.zip"; SHA256="c8844c03f3c233d6a466d59fd3f4e6f21470bd685e1b7cc82d650379a9b23e35" ;; \
       *) echo "unsupported arch: $TARGETARCH"; exit 1 ;; \
     esac && \
     curl -fsSL \
-      "https://github.com/daijro/camoufox/releases/download/v152.0.4-beta.28/${ZIP}" \
+      "https://github.com/daijro/camoufox/releases/download/v152.0.4-beta.29/${ZIP}" \
       -o /tmp/camoufox.zip && \
     echo "${SHA256}  /tmp/camoufox.zip" | sha256sum --check --strict - && \
     unzip -q /tmp/camoufox.zip -d /opt/camoufox && \
     rm /tmp/camoufox.zip && \
-    printf '{"version":"152.0.4","release":"beta.28"}\n' > /opt/camoufox/version.json && \
+    printf '{"version":"152.0.4","release":"beta.29"}\n' > /opt/camoufox/version.json && \
     chmod -R 755 /opt/camoufox && \
     if [ "$CAMOUFOX_KEEP_SPOOFED_OS_FONTS" != "1" ]; then \
       rm -rf /opt/camoufox/fonts/macos /opt/camoufox/fonts/windows; \

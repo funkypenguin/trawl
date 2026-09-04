@@ -7,7 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-09-04
+
 ### Changed
+- Bump all application and internal package versions to `1.5.0`.
+- Updated all direct and compatible transitive dependencies to their latest available releases, including Bun 1.4.0, Camoufox 152.0.4-beta.29, uBlock Origin 1.74.0, Biome 2.5.12, Elysia 1.4.30, Zod 4.5.4, and Patchright 1.62.3. Playwright Core remains on 1.60.0 for Camoufox compatibility, and the Nuxt app remains on TypeScript 5.9.3 for vue-tsc compatibility.
 - Reorganized runtime configuration into concise subsystem namespaces. Console/network limits now use `DIAGNOSTICS_*`, redirect-chain limits use `REDIRECT_*`, response-body limits remain under `CAPTURE_*`, forward-proxy settings use `MITM_*`, and Redis session expiry is `REDIS_SESSION_TTL_SECONDS`. `BROWSER_MAX_CONTENT_PROCESSES` now makes the process cap explicit; the unused `CHROME_EXECUTABLE` entry was removed. These names replace the previous environment variables without compatibility aliases; the [configuration migration guide](apps/docs/deployment/configuration-migration.md) contains the complete mapping.
 - An empty or unset `REDIS_URL` now disables the optional session cache without attempting a localhost connection or requiring a separate enable flag.
 - Supplied Compose variants now explicitly pass every supported runtime tuning variable from `.env` into the container instead of silently ignoring screenshot, diagnostics, redirect, response-capture, and CAPTCHA settings.

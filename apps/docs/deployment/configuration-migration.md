@@ -1,11 +1,11 @@
 ---
 title: Configuration Migration
-description: Breaking environment-variable and Docker build-argument renames planned for the next TRAWL release.
+description: Breaking environment-variable and Docker build-argument renames introduced in TRAWL v1.5.0.
 ---
 
 # Configuration migration
 
-The next TRAWL release reorganizes configuration into short, subsystem-specific namespaces. The old
+TRAWL v1.5.0 reorganizes configuration into short, subsystem-specific namespaces. The old
 names are not retained as aliases: update `.env`, Compose overrides, container manifests, secrets,
 and deployment automation before upgrading.
 

@@ -11,7 +11,7 @@ TRAWL is a Bun workspace monorepo. You can run each service locally with hot-rel
 
 | Tool  | Version | Install                                     |
 | ----- | ------- | ------------------------------------------- |
-| Bun   | ≥ 1.2   | `curl -fsSL https://bun.sh/install \| bash` |
+| Bun   | ≥ 1.4   | `curl -fsSL https://bun.sh/install \| bash` |
 | Redis | 8.8+    | Docker (see below)                          |
 
 ## 1. Install dependencies
