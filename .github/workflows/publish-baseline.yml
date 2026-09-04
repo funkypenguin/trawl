@@ -32,7 +32,13 @@ env:
   IMAGE: ghcr.io/${{ github.repository_owner }}/trawl
 
 jobs:
+  verify:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci.yml
+
   build:
+    needs: verify
     strategy:
       matrix:
         include:

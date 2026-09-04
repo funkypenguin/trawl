@@ -15,9 +15,9 @@ const apps = [
     <div class="container eco-inner">
       <span class="eco-label">FlareSolverr v2 compatible —</span>
       <div class="eco-apps">
-        <span v-for="(app, i) in apps" :key="app.name" class="eco-app" :style="{ animationDelay: `${i * 0.5}s` }"
-          >{{ app.name }}</span
-        >
+        <span v-for="(app, i) in apps" :key="app.name" class="eco-app" :style="{ animationDelay: `${i * 0.5}s` }">{{
+          app.name
+        }}</span>
       </div>
       <span class="eco-label">— connect with a single URL change</span>
     </div>

@@ -261,7 +261,7 @@ tbody tr:hover .col-trawl {
 }
 
 /* Score footer */
-tfoot tr td {
+tfoot tr:last-child td {
   border-top: 2px solid var(--border-strong);
   border-bottom: none;
   background: var(--bg-subtle);
